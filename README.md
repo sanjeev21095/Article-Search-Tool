@@ -8,8 +8,16 @@ in context and take the searchers intent into account. This project aims to buil
 tool that will point to a right set of documents for the user on an offline interface.
 ### Step - 1 : Downlaod the dataset
 The dataset is a set of accepted papers from the Neural Information Processing System
-Conference, 2015 (NIPS 2015) Download from [here](https://www.kaggle.com/benhamner/nips-2015-papers/version/2/home) and also the code to get the papers are shown [here](https://github.com/benhamner/nips-2015-papers).
+Conference, 2015 (NIPS 2015) Download from [here](https://www.kaggle.com/benhamner/nips-2015-papers/version/2/home) and also the code to get the papers are shown [here](https://github.com/benhamner/nips-2015-papers). Parallely, download the pre-trained [GloVe Vectors](https://nlp.stanford.edu/projects/glove/).
 ### Step - 2 : Dataset Cleaning
 Good luck dealing with raw data!
 This dataset is slightly corrupted and needs some cleaning. Use [Pdfminer](https://stackoverflow.com/questions/26494211/extracting-text-from-a-pdf-file-using-pdfminer-in-python) tool to extract data from the downloaded pdf files to text files.
 ### Step - 3 : Clean up the dataset
+This step is straightforward
+1. Split each document into its title and body
+2. Strip the document of links, citations, stop words and other special characters
+3. Tokenize the words in the document
+### Step - 4 : Training
+Run the file LSTM.py
+### Step - 5 : Create the GUI
+The GUI is made using tkinter. The link to the video on how to use the GUI is shown [here](https://youtu.be/jgrfciDYHd4). Detailed description of this project is compiled in the Article Search Tool pdf file.
