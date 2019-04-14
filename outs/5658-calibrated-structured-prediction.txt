@@ -1,0 +1,788 @@
+Calibrated Structured Prediction
+
+Volodymyr Kuleshov
+
+Department of Computer Science
+
+Stanford University
+Stanford, CA 94305
+
+Percy Liang
+
+Department of Computer Science
+
+Stanford University
+Stanford, CA 94305
+
+Abstract
+
+In user-facing applications, displaying calibrated conﬁdence measures—
+probabilities that correspond to true frequency—can be as important as obtaining
+high accuracy. We are interested in calibration for structured prediction problems
+such as speech recognition, optical character recognition, and medical diagnosis.
+Structured prediction presents new challenges for calibration: the output space is
+large, and users may issue many types of probability queries (e.g., marginals) on
+the structured output. We extend the notion of calibration so as to handle various
+subtleties pertaining to the structured setting, and then provide a simple recalibra-
+tion method that trains a binary classiﬁer to predict probabilities of interest. We
+explore a range of features appropriate for structured recalibration, and demon-
+strate their efﬁcacy on three real-world datasets.
+
+1
+
+Introduction
+
+Applications such as speech recognition [1], medical diagnosis [2], optical character recognition
+[3], machine translation [4], and scene labeling [5] have two properties: (i) they are instances of
+structured prediction, where the predicted output is a complex structured object; and (ii) they are
+user-facing applications for which it is important to provide accurate estimates of conﬁdence. This
+paper explores conﬁdence estimation for structured prediction.
+Central to this paper is the idea of probability calibration [6, 7, 8, 9], which is prominent in the
+meteorology [10] and econometrics [9] literature. Calibration requires that the probability that a
+system outputs for an event reﬂects the true frequency of that event: of the times that a system says
+that it will rain with probability 0.3, then 30% of the time, it should rain. In the context of structured
+prediction, we do not have a single event or a ﬁxed set of events, but rather a multitude of events
+that depend on the input, corresponding to different conditional and marginal probabilities that one
+could ask of a structured prediction model. We must therefore extend the deﬁnition of calibration in
+a way that deals with the complexities that arise in the structured setting.
+We also consider the practical question of building a system that outputs calibrated probabilities.
+We introduce a new framework for calibration in structured prediction, which involves deﬁning
+probabilities of interest, and then training binary classiﬁers to predict these probabilities based on a
+set of features. Our framework generalizes current methods for binary and multiclass classiﬁcation
+[11, 12, 13], which predict class probabilities based on a single feature, the uncalibrated prediction
+score. In structured prediction, the space of interesting probabilities and useful features is consid-
+erably richer. This motivates us to introduce a new concept of events as well as a range of new
+features—margin, pseudomargin—which have varying computational demands. We perform a thor-
+ough study of which features yield good calibration, and ﬁnd that domain-general features are quite
+good for calibrating MAP and marginal estimates over three tasks—object recognition, optical char-
+acter recognition, and scene understanding. Interestingly, features based on MAP inference alone
+can achieve good calibration on marginal probabilities (which can be more difﬁcult to compute).
+
+1
+
+Figure 1:
+In the context of an
+OCR system, our framework aug-
+ments the structured predictor with
+calibrated conﬁdence measures for
+a set of events, e.g., whether the ﬁrst
+letter is “l”.
+
+2 Background
+
+2.1 Structured Prediction
+In structured prediction, we want to assign a structured label y = (y1, . . . , yL) ∈ Y to an input
+x ∈ X . For example, in optical character recognition (OCR), x is a sequence of images and y is the
+sequence of associated characters (see Figure 1(a)); note that the number of possible outputs y for a
+given x may be exponentially large.
+A common approach to structured prediction is conditional random ﬁelds (CRFs), where we posit a
+probabilistic model pθ(y | x). We train pθ by optimizing a maximum-likelihood or a max-margin
+objective over a training set {(x(i), y(i))}n
+i=1, assumed to be drawn i.i.d. from an unknown data-
+generating distribution P(x, y). The promise of a probabilistic model is that in addition to computing
+the most likely output ˆy = arg maxy pθ(y | x), we can also get its probability pθ(y = ˆy | x) ∈ [0, 1],
+or even marginal probabilities pθ(y1 = ˆy1 | x) ∈ [0, 1].
+
+2.2 Probabilistic Forecasting
+
+Probabilities from a CRF pθ are just numbers that sum to 1. In order for these probabilities to be
+useful as conﬁdence measures, we would ideally like them to be calibrated. Calibration intuitively
+means that whenever a forecaster assigns 0.7 probability to an event, it should be the case that the
+event actually holds about 70% of the time. In the case of binary classiﬁcation (Y = {0, 1}), we say
+that a forecaster F : X → [0, 1] is perfectly calibrated if for all possible probabilities p ∈ [0, 1]:
+
+P[y = 1 | F (x) = p] = p.
+
+(1)
+
+Calibration by itself does not guarantee a useful conﬁdence measure. A forecaster that always
+outputs the marginal class probability F (x) = P(y = 1) is calibrated but useless for accurate
+prediction. Good forecasts must also be sharp, i.e., their probabilities should be close to 0 or 1.
+Calibration and sharpness. Given a forecaster F : X → [0, 1], deﬁne T (x) = E[y | F (x)] to be
+the true probability of y = 1 given a that x received a forecast F (x). We can use T to decompose
+the (cid:96)2 prediction loss as follows:
+
+E[(y − F (x))2] = E[(y − T (x))2] + E[(T (x) − F (x))2]
+
+= Var[y]
+
+(cid:124) (cid:123)(cid:122) (cid:125)
+
+uncertainty
+
+− Var[T (x)]
+
++ E[(T (x) − F (x))2]
+
+(cid:124)
+
+(cid:123)(cid:122)
+
+(cid:125)
+
+(cid:124)
+
+(cid:123)(cid:122)
+
+.
+
+(2)
+(3)
+
+(cid:125)
+
+sharpness
+
+calibration error
+
+The ﬁrst equality follows because y − T (x) has expectation 0 conditioned on F (x), and the second
+equality follows from the variance decomposition of y onto F (x).
+The three terms in (3) formalize our intuitions about calibration and sharpness [7]. The calibration
+term measures how close the predicted probability is to the true probability over that region and is
+a natural generalization of perfect calibration (1) (which corresponds to zero calibration error). The
+sharpness term measures how much variation there is in the true probability across forecasts. It does
+not depend on the numerical value of the forecaster F (x), but only the induced grouping of points;
+it is maximized by making F (x) closer to 0 and 1. Uncertainty does not depend on the forecaster
+and can be mostly ignored; note that it is always greater than sharpness and thus ensures that the
+loss stays positive.
+
+2
+
+y1y2y3y4x“l”“a”“n”“d”EventProbability[y=“land”]0.8[y1=“l”]0.8[y2=“a”]0.9[y3=“n”]0.9[y4=“d”]0.8(a)Structuredpredictionmodel(b)Forecasteroutputdifference
+
+error
+
+input x
+true P(y | x)
+calibrated, unsharp pθ(y | x)
+uncalibrated, sharp pθ(y | x)
+balanced pθ(y | x)
+
+sharp.
+Examples. To illustrate
+0.167
+between
+the
+0
+calibration
+(lower
+0.167
+is better) and sharpness
+0.125
+(higher is better), consider
+the following binary clas-
+siﬁcation example: we have a uniform distribution (P(x) = 1/3) over inputs X = {0, 1, 2}. For
+x ∈ {0, 1}, y = x with probability 1, and for x = 2, y is either 0 or 1, each with probability 1
+2.
+Setting pθ(y | x) ≡ 0.5 would achieve perfect calibration (0) but not sharpness (0). We can get
+excellent sharpness (0.167) but suffer in calibration (0.03) by predicting probabilities 0.2, 0.8, 0.4.
+We can trade off some sharpness (0.125) for perfect calibration (0) by predicting 0 for x = 0 and
+0.75 for x ∈ {1, 2}.
+
+calib.
+0
+0
+0.03
+0
+
+1
+1
+0.5
+0.8
+0.75
+
+0
+0
+0.5
+0.2
+0
+
+2
+0.5
+0.5
+0.4
+0.75
+
+Discretized probabilities. We have assumed so far that the forecaster might return arbitrary prob-
+abilities in [0, 1]. In this case, we might need an inﬁnite amount of data to estimate T (x) = E[y |
+F (x)] accurately for each value of F (x). In order to estimate calibration and sharpness from ﬁnite
+data, we use a discretized version of calibration and sharpness. Let B be a partitioning of the interval
+[0, 1]; for example B = {[0, 0.1), [0.1, 0.2), . . .}. Let B : [0, 1] → B map a probability p to the
+interval B(p) containing p; e.g., B(0.15) = [0.1, 0.2). In this case, we simply redeﬁne T (x) to be
+the true probability of y = 1 given that F (x) lies in a bucket: T (x) = E[y | B(F (x))]. It is not hard
+to see that discretized calibration estimates form an upper bound on the calibration error (3) [14].
+
+3 Calibration in the Context of Structured Prediction
+
+We have so far presented calibration in the context of binary classiﬁcation. In this section, we extend
+these deﬁnitions to structured prediction. Our ultimate motivation is to construct forecasters that
+augment pre-trained structured models pθ(y|x) with conﬁdence estimates. Unlike in the multiclass
+setting [12], we cannot learn a forecaster Fy : X → [0, 1] that targets P(y | x) for each y ∈ Y
+because the cardinality of Y is too large; in fact, the user will probably not be interested in every y.
+
+Events of interest.
+Instead, we assume that for a given x and associated prediction y, the user is
+interested in a set I(x) of events concerning x and y. An event E ∈ I(x) is a subset E ⊆ Y; we
+would like to determine the probability P(y ∈ E | x) for each E ∈ I(x). Here are two useful types
+of events that will serve as running examples:
+
+1. {MAP(x)}, which encodes whether MAP(x) = arg maxy pθ(y | x) is correct.
+2. {y : yj = MAP(x)j}, which encodes whether the label at position j in MAP(x) is correct.
+In the OCR example (Figure 1), suppose we predict MAP(x) = “land”. Deﬁne the events of
+interest to be the MAP and the marginals: I(x) = {{MAP(x)},{y : y1 = MAP(x)1}, . . . ,{y :
+yL = MAP(x)L}}. Then we have I(x) = {{“land”},{y : y1 = “l”},{y : y2 = “a”},{y : y3 =
+“n”},{y : y4 = “d”}}. Note that the events of interest I(x) depend on x through MAP(x).
+
+Event pooling. We now deﬁne calibration in analogy with (1). We will construct a forecaster
+F (x, E) that tries to predict P(y ∈ E | x). As we remarked earlier, we cannot make a statement
+that holds uniformly for all events E; we can only make a guarantee in expectation. Thus, let E be
+drawn uniformly from I(x), so that P is extended to be a joint distribution over (x, y, E). We say
+that a forecaster F : X × 2Y (cid:55)→ [0, 1] is perfectly calibrated if
+
+P (y ∈ E | F (x, E) = p) = p.
+
+(4)
+In other words, averaged over all x, y and events of interest E ∈ I(x), whenever the forecaster
+outputs probability p, then the event E actually holds with probability p. Note that this deﬁni-
+tion corresponds to perfect binary calibration (1) for the transformed pair of variables y(cid:48) = I[y ∈
+E], x(cid:48) = (x, E). As an example, if I(x) = {{MAP(x)}}, then (4) says that of all the MAP predic-
+tions with conﬁdence p, a p fraction will be correct. If I(x) = {{y : yj = MAP(x)j}}L
+j=1, then
+(4) states that out of all the marginals (pooled together across all samples x and all positions j) with
+conﬁdence p, a p fraction will be correct.
+
+3
+
+Algorithm 1 Recalibration procedure for calibrated structured prediction.
+Input: Features φ(x, E) from trained model pθ, event set I(x), recalibration set S = {(xi, yi)}n
+Output: Forecaster F (x, E).
+Construct the events dataset: Sbinary = {(φ(x, E), I[y ∈ E]) : (x, y) ∈ S, E ∈ I(x)}
+Train the forecaster F (e.g., k-NN or decision trees) on Sbinary.
+
+i=1.
+
+The second example hints at an important subtlety inherent to having multiple events in structured
+prediction. The conﬁdence scores for marginals are only calibrated when averaged over all positions.
+If a user only looked at the marginals for the ﬁrst position, she might be sorely disappointed. As
+2 while y2 ≡ 1. Then
+an extreme example, suppose y = (y1, y2) and y1 is 0 or 1 with probability 1
+a forecaster that outputs a conﬁdence of 0.75 for both events {y : y1 = 1} and {y : y2 = 1} will
+be perfectly calibrated. However, neither event is calibrated in isolation (P(y1 = 1 | x) = 1
+2 and
+P(y2 = 1 | x) = 1). Finally, perfect calibration can be relaxed; following (3), we may deﬁne the
+calibration error to be E[(T (x, E) − F (x, E))2], where T (x, E) def= P(y ∈ E | F (x, E)).
+
+4 Constructing Calibrated Forecasters
+
+Having discussed the aspects of calibration speciﬁc to structured prediction, let us now turn to the
+problem of constructing calibrated (and sharp) forecasters from ﬁnite data.
+
+(x,y)∈S(cid:80)
+(cid:80)
+
+E∈I(x)(F (x, E) − I[y ∈ E])2. Algorithm 1 outlines our procedure.
+
+Recalibration framework. We propose a framework that generalizes existing recalibration strate-
+gies to structured prediction models pθ. First, the user speciﬁes a set of events of interest I(x) as
+well as features φ(x, E), which will in general depend on the trained model pθ. We then train a
+forecaster F to predict whether the event E holds (i.e. I[y ∈ E]) given features φ(x, E). We train F
+by minimizing the empirical (cid:96)2 loss over a recalibration set S (disjoint from the training examples):
+minF
+As an example, consider again the OCR setting in Figure 1. The margin feature φ(x, E) =
+log pθ(MAP(1)(x)) − log pθ(MAP(2)(x)) (where MAP(1)(x) and MAP(2)(x) are the ﬁrst and sec-
+ond highest scoring labels for x according to pθ, respectively) will typically correlate with the event
+that the MAP prediction is correct. We can perform isotonic regression using this feature on the
+recalibration set S to produce well-calibrated probabilities.
+In the limit of inﬁnite data, Algorithm 1 minimizes the expected loss E[(F (x, E) − I[y ∈ E])2],
+where the expectation is over (x, y, E). By (3), the calibration error E[(T (x, E) − F (x, E))2] will
+also be small. If there are not too many features φ, we can drive the (cid:96)2 loss close to zero with
+a nonparametric method such as k-NN. This is also why isotonic regression is sensible for binary
+recalibration: we ﬁrst project the data into a highly informative one-dimensional feature space; then
+we predict labels from that space to obtain small (cid:96)2 loss.
+Note also that standard multiclass recalibration is a special case of this framework, where we use the
+raw uncalibrated score from pθ as a single feature. In the structured setting, one must invest careful
+thought in the choice of classiﬁer and features; we discuss these choices below.
+Features. Calibration is possible even with a single constant feature (e.g. φ(x, E) ≡ 1), but
+sharpness depends strongly on the features’ quality. If φ collapses points of opposite labels, no
+forecaster will be able to separate them and be sharp. While we want informative features, we can
+only afford to have a few, since our recalibration set is typically small.
+Compared to calibration for binary classiﬁcation, our choice of features must also be informed
+by their computational requirements: the most informative features might require performing full
+inference in an intractable model. It is therefore useful to think of features as belonging to one
+of three types, depending on whether they are derived from unstructured classiﬁers (e.g. an SVM
+trained individually on each label), MAP inference, or marginal inference. In Section 5, we will
+show that marginal inference produces the sharpest features, but clever MAP-based features can do
+almost as well.
+In Table 1, we propose several features that follow our guiding principles and that illustrate the
+computational tradeoffs inherent to structured prediction.
+
+4
+
+MAP recalibration on y
+
+Type Name
+none
+MAP
+
+φno
+1 : SVM margin
+φmp
+1 : Label length
+φmp
+2 : Admissibility
+φmp
+3 : Margin
+
+j
+
+Deﬁnition
+[sSVM
+minj mrgyj
+|yMAP|
+I[yMAP ∈ G(x)]
+mrgy[pθ(y | x)]
+
+(yj)]
+
+Marg.
+
+φmg
+1 : Margin
+
+minj mrgyj
+
+[pθ(yj | x)]
+
+j
+
+[sSVM
+
+Marginal recalibration on yj
+Deﬁnition
+Name
+φno
+mrgyj
+2 : SVM margin
+φmp
+% positions j
+4 : Label freq.
+φmp
+% neighbors j
+5 : Neighbors
+∈ L(x)]
+I[yMAP
+φmp
+6 : Label type
+[pθ(yj | yMAP−j , x)]
+φmp
+7 : Pseudomargin mrgyj
+[pθ(yj | x)]
+φmg
+mrgyj
+2 : Margin
+I[yMG
+φmg
+3 : Concordance
+
+j = yMAP
+
+(yj)]
+(cid:48) labeled yMAP
+(cid:48) labeled yMAP
+
+]
+
+j
+
+j
+
+j
+
+j
+
+Table 1: Features for MAP recalibration (I(x) = {{yMAP(x)}}) and marginal recalibration (I(x) = {{y :
+yj = yMAP(x)j}}L
+j=1). We consider three types of features, requiring either unstructured, MAP, or marginal
+inference. For a generic function f, deﬁne mrgaf (a) (cid:44) f (a(1)) − f (a(2)), where a(1) and a(2) are the top
+two inputs to f, ordered by f (a). Let yMG
+(yj) be the score of an SVM
+classiﬁer predicting label yj. Features φmp
+require domain-speciﬁc knowledge: deﬁning admissible
+sets G(x),L(x). In OCR, G are all English words and L(x) are similar-looking letters. Percentages in φmp
+4 and
+φmp
+5 are relative to all the labels in yMAP.
+
+j (cid:44) arg maxyj pθ(yj | x); let sSVM
+2 and φmp
+
+6
+
+j
+
+the form F (x, E) =(cid:80)
+
+Region-based forecasters. Recall from (4) that calibration examines the true probability of an
+event (y ∈ E) conditioned on the forecaster’s prediction F (x, E) = p. By limiting the number of
+different probabilities p that F can output, we can more accurately estimate the true probability for
+each p To this end, let us partition the feature space (the range of φ) into regions R, and output a
+probability FR ∈ [0, 1] for each region R ∈ R. Formally, we consider region-based forecasters of
+R∈R FRI[φ(x, E) ∈ R], where FR is the fraction of points in region R (that
+is, (x, E) for which φ(x, E) ∈ R) for which the event holds (y ∈ E). Note that the partitioning R
+could itself depend on the recalibration set. Two examples of region-based forecasters are k-nearest
+neighbors (k-NN) and decision trees.
+Let us obtain additional insight into the performance of region-based forecasters as a function of
+recalibration set size. Let S denote here a recalibration set of size n, which is used to derive a
+partitioning R and probability estimates FR for each region R ∈ R. Let TR (cid:44) P(y ∈ E | φ(x, E) ∈
+R) be the true event probability for region R, and wR (cid:44) P(φ(x, E) ∈ R) be the probability mass of
+region R. We may rewrite the expected calibration error (3) of FR trained on a random S of size n
+(drawn i.i.d. from P) as
+
+CalibrationErrorn = ER
+
+wRES [(FR − TR)2 | R]
+
+.
+
+(5)
+
+(cid:34)(cid:88)
+
+R∈R
+
+(cid:35)
+
+We see that there is a classic bias-variance tradeoff between having smaller regions (lower bias,
+increased sharpness) and having more data points per region (lower variance, better calibration):
+
+E[(FR − TR)2 | R] = (E[FR | R] − TR)2
+
++ E[(FR − E[FR | R])2 | R]
+
+.
+
+(cid:124)
+
+(cid:123)(cid:122)
+
+bias
+
+(cid:125)
+
+(cid:124)
+
+(cid:123)(cid:122)
+
+variance
+
+(cid:125)
+
+If R is a ﬁxed partitioning independent of S, then the bias will be zero, and the variance is due to
+an empirical average, falling off as 1/n. However, both k-NN and decision trees produce biased
+estimates FR of TR because the regions are chosen adaptively, which is important for achieving
+sharpness. In this case, we can still ensure that the calibration error vanishes to zero if we let the
+regions grow uniformly larger: minR∈R |{(x, y) ∈ S : φ(x, E) ∈ R, E ∈ I(x)}| P−→ ∞.
+
+5 Experiments
+
+We test our proposed recalibrators and features on three real-world tasks.
+
+Multiclass image classiﬁcation. The task is to predict an image label given an image. This setting
+is a special case of structured prediction in which we show that our framework improves over exist-
+ing multiclass recalibration strategies. We perform our experiments on the CIFAR-10 dataset [15],
+
+5
+
+Figure 2: MAP recalibration in the multiclass and chain CRF settings (left and middle) and marginal
+recalibration of the graph CRF (right). The legend includes the (cid:96)2 loss before and after calibration.
+The radius of the black balls reﬂects the number of points having the given forecasted and true
+probabilities.
+
+which consists of 60,000 32x32 color images of different types of animals and vehicles (ten classes
+in total). We train a linear SVM on features derived from k-means clustering and that produce high
+accuracies (79%) on this dataset [16]. We use 800 out of the 1600 features having the highest mu-
+tual information with the label (the drop in performance is negligible). 38,000 images were used for
+training, 2,000 for calibration, and 20,000 for testing.
+
+Optical character recognition. The task is to predict the word (sequence of characters) given a
+sequence of images (Figure 1). Calibrated OCR systems can be useful for automatic sorting of mail.
+This setting demonstrates calibration on a tractable linear-chain CRF. We used a dataset consisting
+of ∼ 8-character-long words from 150 human subjects [3]. Each character is rasterized into a 16× 8
+binary image. We chose 2000 words for training and another 2000 for testing. The remaining words
+are subsampled in various ways to produce recalibration sets.
+
+Scene understanding. Given an image divided into a set of regions, the task is to label each region
+with its type (e.g. person, tree, etc.). Calibrated scene understanding is important for building
+autonomous agents that try to take optimal actions in the environment, integrating over uncertainty.
+This is a structured prediction setting in which inference is intractable. We conduct experiments on
+a post-processed VOC Pascal dataset [5]. In brief, we train a graph CRF to predict the joint labeling
+yi of superpixels yij in an image (∼ 100 superpixels per image; 21 possible labels). The input
+xi consists of 21 node features; CRF edges connect adjacent superpixels. We use 600 examples
+for training, 500 for testing and subsample the remaining ∼ 800 examples to produce calibration
+sets. We perform MAP inference using AD3, a dual composition algorithm; we use a mean ﬁeld
+approximation to compute marginals.
+
+Experimental setup. We perform both MAP and marginal calibration as described in Section 3.
+We use decision trees and k-NN as our recalibration algorithms and examine the quality of our
+forecasts based on calibration and sharpness (Section 2). We further discretize probabilities into
+buckets of size 0.1: B = {[ i−1
+We report results using calibration curves: For each test point (xi, Ei, yi), let fi = F (xi, Ei) ∈
+[0, 1] be the forecasted probability and ti = I[yi ∈ Ei] ∈ {0, 1} be the true outcome. For each
+bucket B ∈ B, we compute averages fB = N−1
+i:fi∈B ti, where
+NB = |{fi ∈ B}| is the number of points in bucket B. A calibration curve plots the tB as a
+function of fB. Perfect calibration corresponds to a straight line. See Figure 2 for an example.
+
+10 ) : i = 1, . . . , 10}.
+(cid:80)
+i:fi∈B fi and tB = N−1
+
+10 , i
+
+B
+
+(cid:80)
+
+B
+
+5.1
+
+“Out-of-the-Box” Recalibration
+
+We would ﬁrst like to demonstrate that our approach works well “out of the box” with very simple
+parameters: a single feature, k-NN with k = 100, and a reasonably-sized calibration set. We report
+results in three settings: (i) multiclass and (ii) chain CRF MAP recalibration with the margin feature
+φmg
+1 (Figure 2, left, middle), as well as (iii) graph CRF marginal recalibration with the margin feature
+φmg
+(Figure 2, right). We use calibration sets of 2,000, 1,000, and 300 (respectively) and compare
+to the raw CRF probabilities pθ(y ∈ E | x).
+2
+
+6
+
+0.00.20.40.60.81.0Mean predicted value0.00.20.40.60.81.0Fraction of positivesImage classification (Multi-class MAP recal.);75% accuracy on raw uncalibrated SVMraw (23.0)cal (19.6)1-vs-a (20.1)0.00.20.40.60.81.0Mean predicted value0.00.20.40.60.81.0OCR (Chain CRF MAP recalibration);45% per-word accuracy using Viterbi decodingraw (29.5)cal (13.6)0.00.20.40.60.81.0Mean predicted value0.00.20.40.60.81.0Scene understanding (Graph CRF marginal recal.);78% accuracy using mean-field marg. decodingraw (65.9)cal (18.6)Figure 3: Feature analysis for MAP and marginal recalibration of the chain CRF (left and middle,
+resp.) and marginal recalibration of the graph CRF (right). Subplots show calibration curves for
+various groups of features from Table 1, as well as (cid:96)2 losses; dot sizes indicate relative bucket size.
+
+Figure 2 shows that our predictions (green line) are well-calibrated in every setting. In the multiclass
+setting, we outperform an existing approach which individually recalibrates one-vs-all classiﬁers and
+normalizes their probability estimates [12]. This suggests that recalibrating for a speciﬁc event (e.g.
+the highest scoring class) is better than ﬁrst estimating all the multiclass probabilities.
+
+5.2 Feature Analysis
+
+4 , φmp
+
+(which
+2 , although they lack resolution.
+5 ) that capture whether a label is similar
+
+Next, we investigate the role of features. In Figure 3, we consider three structured settings, and
+in each setting evaluate performance using different sets of features from Table 1. From top to
+bottom, the subplots describe progressively more computationally demanding features. Our main
+takeaways are that clever inexpensive features do as well as naive expensive ones, that features may
+be complementary and help each other, and that recalibration allows us to add “global” features to a
+chain CRF. We also see that features affect only sharpness.
+In the intractable graph CRF setting (Figure 3, right), we observe that pseudomarginals φmp
+require only MAP inference) fare almost as well as true marginals φmg
+Augmenting with additional MAP-based features (φmp
+to its neighbors and whether it occurs elsewhere in the image resolves this.
+This synergistic interaction of features appears elsewhere. On marginal chain CRF recalibration
+(Figure 3, left), the margin φmg
+2 between the two best classes yields calibrated forecasts that slightly
+lack sharpness near zero (points with e.g. 50% and 10% conﬁdences will have similarly small
+margins). Adding the MAP-marginal concordance feature φmg
+improves calibration, since we can
+further differentiate between low and very low conﬁdence estimates. Similarly, individual SVM and
+MAP-based features φno
+6 are 26 binary indicators, one per character) are calibrated,
+but not very sharp. They accurately identify 70%, 80% and 90% conﬁdence sets, which may be
+sufﬁcient in practice, given that they take no additional time to compute. Adding features based on
+marginals φmg
+On MAP CRF recalibration (Figure 3, middle), we see that simple features (φmp
+2 ) can fare better
+is the length of a word; G in φmp
+than more sophisticated ones like the margin φmp
+2
+encodes whether the word yMAP is in the dictionary). This demonstrates that recalibration lets us
+introduce new global features beyond what’s in the original CRF, which can dramatically improve
+calibration at no additional inferential cost.
+
+3 improves sharpness.
+
+(the φmp
+
+2 , φmg
+
+(recall that φmp
+
+1
+
+3
+
+1 , φmp
+
+7
+
+2 , φmp
+
+6
+
+3
+
+7
+
+0.00.20.40.60.81.0Uncalibrated:30.20.00.20.40.60.81.0UnstructuredSVMscoresφno2:15.80.00.20.40.60.81.026characterindicatorsφmp6:16.10.00.20.40.60.81.0Marginalprobabilitiesφmg2:12.00.00.20.40.60.81.0Marginalprobabilities+Marginal/MAPagreementφmg2,φmg3:10.90.00.10.20.30.40.50.60.70.80.91.0Per-letterOCR(ChainCRFmarginalrecalibration);84%per-letteraccuracyusingViterbidecoding0.00.20.40.60.81.0Allfeatures:10.80.00.20.40.60.81.0Uncalibrated:21.00.00.20.40.60.81.0UnstructuredSVMscoresφno1:20.50.00.20.40.60.81.0Length+Presenceindict.φmp1,φmp2:4.20.00.20.40.60.81.0Marginbetween1stand2ndbestφmp3:13.10.00.20.40.60.81.0Lowestmarginalprobabilityφmg1:20.60.00.10.20.30.40.50.60.70.80.91.0Per-wordOCR(ChainCRFMAPrecalibration);45%per-wordaccuracyusingViterbidecoding0.00.20.40.60.81.0Allfeatures:4.00.00.20.40.60.81.0Uncalibrated:67.00.00.20.40.60.81.0UnstructuredSVMscoresφno2:14.70.00.20.40.60.81.0Pseudomarginsφmp7:17.00.00.20.40.60.81.0Pseudomargins,otherMAPfeaturesφmp4,φmp5,φmp7:15.40.00.20.40.60.81.0Marginals,MAP/marg.concordanceφmg2:15.90.00.10.20.30.40.50.60.70.80.91.0Sceneunderstanding(GraphCRFmarginalrecalibration);78%accuracyusingmean-ﬁeldmarg.decoding0.00.20.40.60.81.0Allfeatures:14.0Figure 4: Calibration error
+(blue) and sharpness (green)
+of k-NN (left) and decision
+trees (right) as a function
+of calibration set size (chain
+CRF; marginal recalibration).
+
+5.3 Effects of Recalibration Set Size and Recalibration Technique
+
+Lastly, in Figure 4, we compare k-NN and decision trees on chain CRF marginal prediction using
+2 . We subsample calibration sets S of various sizes N. For each N and each algorithm
+feature φmg
+we choose a hyperparameter (minimum leaf size for decision trees, k in k-NN) by 10-fold cross-
+validation on S. We tried values between 5 and 500 in increments of 5.
+Figure 4 shows that for both methods, sharpness remains constant, while the calibration error de-
+creases with N and quickly stabilizes below 10−3; this conﬁrms that we can always recalibrate with
+enough data. The decrease in calibration error also indicates that cross-validation successfully ﬁnds
+a good model for each N. Finally, we found that k-NN fared better when using continuous features
+(see also right columns of Figures 2 and 3); decision trees performed much better on categorical
+features.
+
+6 Previous Work and Discussion
+
+Calibration and sharpness provide the conceptual basis for this work. These ideas and their con-
+nection to l2 losses have been explored extensively in the statistics literature [7, 9] in connection to
+forecast evaluation; there exist generalizations to other losses as well [17, 10]. Calibration in the
+online setting is a ﬁeld in itself; see [8] for a starting point. Finally, calibration has been explored
+extensively from a Bayesian viewpoint, starting with the seminal work of Dawid [18].
+Recalibration has been mostly studied in the binary classiﬁcation setting, with Platt scaling [11] and
+isotonic regression [13] being two popular and effective methods. Non-binary methods typically
+involve training one-vs-all predictors [12] and include extensions to ranking losses [19] and com-
+binations of estimators [20]. Our generalization to structured prediction required us to develop the
+notion of events of interest, which even in the multiclass setting works better than estimating every
+class probability, and this might be useful beyond typical structured prediction problems.
+Conﬁdence estimation methods play a key role in speech recognition [21], but they require domain
+speciﬁc acoustic features [1]. Our approach is more general, as it applies in any graphical model
+(including ones where inference is intractable), uses domain-independent features, and guarantees
+calibrated probabilities, rather than simple scores that correlate with accuracy.
+The issue of calibration arises any time one needs to assess the conﬁdence of a prediction. Its im-
+portance has been discussed and emphasized in medicine [22], natural language processing [23],
+speech recognition [21], meteorology [10], econometrics [9], and psychology [24]. Unlike uncali-
+brated conﬁdence measures, calibrated probabilities are formally tied to objective frequencies. They
+are easy to understand by users, e.g., patients undergoing diagnosis or researchers querying a prob-
+abilistic database. Moreover, modern AI systems typically consist of a pipeline of modules [23]. In
+this setting, calibrated probabilities are important to express uncertainty meaningfully across differ-
+ent (potentially third-party) modules. We hope our extension to the structured prediction setting can
+help make calibration more accessible and easier to apply to more complex and diverse settings.
+
+Acknowledgements. This research is supported by an NSERC Canada Graduate Scholarship to
+the ﬁrst author and a Sloan Research Fellowship to the second author.
+
+Reproducibility. All code, data, and experiments for this paper are available on CodaLab at
+https://www.codalab.org/worksheets/0xecc9a01cfcbc4cd6b0444a92d259a87c/.
+
+8
+
+0500100015002000Recalibration set size10-410-310-210-1kNNCalSha0500100015002000Recalibration set size10-410-310-210-1Decision treeReferences
+[1] M. Seigel. Conﬁdence Estimation for Automatic Speech Recognition Hypotheses. PhD thesis, University
+
+of Cambridge, 2013.
+
+[2] D. E. Heckerman and B. N. Nathwani. Towards normative expert systems: Probability-based representa-
+
+tions for efﬁcient knowledge acquisition and inference. Methods Archive, 31(2):106–116, 1992.
+
+[3] R. H. Kassel. A comparison of approaches to on-line handwritten character recognition. PhD thesis,
+
+Massachusetts Institute of Technology, 1995.
+
+[4] P. Liang, A. Bouchard-Cˆot´e, D. Klein, and B. Taskar. An end-to-end discriminative approach to machine
+translation. In International Conference on Computational Linguistics and Association for Computational
+Linguistics (COLING/ACL), 2006.
+
+[5] A. Mueller. Methods for Learning Structured Prediction in Semantic Segmentation of Natural Images.
+
+PhD thesis, University of Bonn, 2013.
+
+[6] G. W. Brier. Veriﬁcation of forecasts expressed in terms of probability. Monthly weather review, 78(1):1–
+
+3, 1950.
+
+[7] A. H. Murphy. A new vector partition of the probability score.
+
+12(4):595–600, 1973.
+
+Journal of Applied Meteorology,
+
+[8] D. P. Foster and R. V. Vohra. Asymptotic calibration, 1998.
+[9] T. Gneiting, F. Balabdaoui, and A. E. Raftery. Probabilistic forecasts, calibration and sharpness. Journal
+
+of the Royal Statistical Society: Series B (Statistical Methodology), 69(2):243–268, 2007.
+
+[10] J. Brocker. Reliability, sufﬁciency, and the decomposition of proper scores. Quarterly Journal of the
+
+Royal Meteorological Society, 135(643):1512–1519, 2009.
+
+[11] J. Platt. Probabilistic outputs for support vector machines and comparisons to regularized likelihood
+
+methods. Advances in Large Margin Classiﬁers, 10(3):61–74, 1999.
+
+[12] B. Zadrozny and C. Elkan. Transforming classiﬁer scores into accurate multiclass probability estimates.
+
+In International Conference on Knowledge Discovery and Data Mining (KDD), pages 694–699, 2002.
+
+[13] A. Niculescu-Mizil and R. Caruana. Predicting good probabilities with supervised learning. In Proceed-
+
+ings of the 22nd international conference on Machine learning, pages 625–632, 2005.
+
+[14] D. B. Stephenson, C. A. S. Coelho, and I. T. Jolliffe. Two extra components in the brier score decompo-
+
+sition. Weather Forecasting, 23:752–757, 2008.
+
+[15] A. Krizhevsky. Learning multiple layers of features from tiny images. Technical report, University of
+
+Toronto, 2009.
+
+[16] A. Coates and A. Y. Ng. Learning feature representations with K-means. Neural Networks: Tricks of the
+
+Trade - Second Edition, 2(1):561–580, 2012.
+
+[17] A. Buja, W. Stuetzle, and Y. Shen. Loss functions for binary class probability estimation and classiﬁcation:
+
+Structure and applications, 2005.
+
+[18] D. A. Philip. The well-calibrated Bayesian. Journal of the American Statistical Association (JASA),
+
+77(379):605–610, 1982.
+
+[19] A. K. Menon, X. Jiang, S. Vembu, C. Elkan, and L. Ohno-Machado. Predicting accurate probabilities
+
+with a ranking loss. In International Conference on Machine Learning (ICML), 2012.
+
+[20] L. W. Zhong and J. Kwok. Accurate probability calibration for multiple classiﬁers. In International Joint
+
+Conference on Artiﬁcial Intelligence (IJCAI), pages 1939–1945, 2013.
+
+[21] D. Yu, J. Li, and L. Deng. Calibration of conﬁdence measures in speech recognition. Trans. Audio, Speech
+
+and Lang. Proc., 19(8):2461–2473, 2011.
+
+[22] X. Jiang, M. Osl, J. Kim, and L. Ohno-Machado. Calibrating predictive model estimates to support
+personalized medicine. Journal of the American Medical Informatics Association, 19(2):263–274, 2012.
+[23] K. Nguyen and B. O’Connor. Posterior calibration and exploratory analysis for natural language pro-
+cessing models. In Empirical Methods in Natural Language Processing (EMNLP), pages 1587–1598,
+2015.
+
+[24] S. Lichtenstein, B. Fischhoff, and L. D. Phillips. Judgement under Uncertainty: Heuristics and Biases.
+
+Cambridge University Press, 1982.
+
+9
+
+

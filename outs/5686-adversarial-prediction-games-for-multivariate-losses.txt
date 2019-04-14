@@ -1,0 +1,1359 @@
+Adversarial Prediction Games for Multivariate Losses
+
+Hong Wang
+
+{hwang27, wxing3, kasif2, bziebart}@uic.edu
+
+Chicago, IL 60607
+
+Kaiser Asif
+
+Wei Xing
+Department of Computer Science
+University of Illinois at Chicago
+
+Brian D. Ziebart
+
+Abstract
+
+Multivariate loss functions are used to assess performance in many modern pre-
+diction tasks, including information retrieval and ranking applications. Convex
+approximations are typically optimized in their place to avoid NP-hard empir-
+ical risk minimization problems. We propose to approximate the training data
+instead of the loss function by posing multivariate prediction as an adversarial
+game between a loss-minimizing prediction player and a loss-maximizing evalua-
+tion player constrained to match speciﬁed properties of training data. This avoids
+the non-convexity of empirical risk minimization, but game sizes are exponential
+in the number of predicted variables. We overcome this intractability using the
+double oracle constraint generation method. We demonstrate the efﬁciency and
+predictive performance of our approach on tasks evaluated using the precision at
+k, the F-score and the discounted cumulative gain.
+
+1
+
+Introduction
+
+For many problems in information retrieval and learning to rank, the performance of a predictor is
+evaluated based on the combination of predictions it makes for multiple variables. Examples in-
+clude the precision when limited to k positive predictions (P@k), the harmonic mean of precision
+and recall (F-score), and the discounted cumulative gain (DCG) for assessing ranking quality. These
+stand in contrast to measures like the accuracy and (log) likelihood, which are additive over indepen-
+dently predicted variables. Many multivariate performance measures are not concave functions of
+predictor parameters, so maximizing them over empirical training data (or, equivalently, empirical
+risk minimization over a corresponding non-convex multivariate loss function) is computationally
+intractable [11] and can only be accomplished approximately using local optimization methods [10].
+Instead, convex surrogates for the empirical risk are optimized using either an additive [21, 12, 22]
+or a multivariate approximation [14, 24] of the loss function. For both types of approximations,
+the gap between the application performance measure and the surrogate loss measure can lead to
+substantial sub-optimality of the resulting predictions [4].
+Rather than optimizing an approximation of the multivariate loss for available training data, we take
+an alternate approach [26, 9, 1] that robustly minimizes the exact multivariate loss function using
+approximations of the training data. We formalize this using a zero-sum game between a predictor
+player and an adversarial evaluator player. Learned weights parameterize this game’s payoffs and
+enable generalization from training data to new predictive settings. The key computational challenge
+this approach poses is that the size of multivariate prediction games grows exponentially in the
+number of variables. We leverage constraint generation methods developed for solving large zero-
+sum games [20] and efﬁcient methods for computing best responses [6] to tame this complexity.
+In many cases, the structure of the multivariate loss function enables the zero-sum game’s Nash
+equilibrium to be efﬁciently computed. We formulate parameter estimation as a convex optimization
+problem and solve it using standard convex optimization methods. We demonstrate the beneﬁts of
+this approach on prediction tasks with P@k, F-score and DCG multivariate evaluation measures.
+
+1
+
+2 Background and Related Work
+
+2.1 Notation and multivariate performance functions
+
+the general
+
+We consider
+task of making a multivariate prediction for variables y =
+{y1, y2, . . . , yn} ∈ Y n (with random variables denoted as Y = {Y1, Y2, . . . , Yn}) given some
+contextual information x = {x1, x2, . . . , xn} ∈ X = {X1, X2, . . . , Xn} (with random variable,
+X). Each xi is the information relevant to predicted variable yi. We denote the estimator’s predicted
+values as ˆy = {ˆy1, ˆy2, . . . , ˆyn}. The multivariate performance measure when predicting ˆy when the
+true multivariate value is actually y is represented as a scoring function: score(ˆy, y). Equivalently,
+a complementary loss function for any score function based on the maximal score can be deﬁned as:
+loss(ˆy, y) = maxy(cid:48),y(cid:48)(cid:48) score(y(cid:48), y(cid:48)(cid:48)) − score(ˆy, y).
+For information retrieval, a vector of retrieved items from the pool of n items can be represented
+as ˆy ∈ {0, 1}n and a vector of relevant items as y ∈ {0, 1}n with x = {x1, x2, . . . , xn} denot-
+ing side contextual information (e.g., search terms and document contents). Precision and recall
+are important measures for information retrieval systems. However, maximizing either leads to
+degenerate solutions (predict all to maximize recall or predict none to maximize precision). The
+k where ||ˆy||1 = k,
+precision when limited to exactly k positive predictions, P@k(ˆy, y) = ˆy·y
+is one popular multivariate performance measure that avoids these extremes. Another is the F-
+score, which is the harmonic mean of the precision and recall often used in information re-
+trieval tasks. Using this notation, the F-score for a set of items can be simply represented as:
+F1(ˆy, y) =
+
+and F1(0, 0) = 1.
+
+2ˆy·y
+
+||ˆy ||1+||y||1
+
+In other information retrieval tasks, a ranked list of retrieved items is desired. This can be rep-
+resented as a permutation, σ, where σ(i) denotes the ith-ranked item (and σ−1(j) denotes the
+rank of the jth item). Evaluation measures that emphasize the top-ranked items are used, e.g.,
+to produce search engine results attuned to actual usage. The discounted cumulative gain (DCG)
+measures the performance of item rankings with k relevancy scores, yi ∈ {0, . . . , k − 1} as:
+
+log2(i+1) or DCG(cid:48)(ˆσ, y) = yˆσ(1) +(cid:80)n
+
+2yˆσ(i)−1
+
+DCG(ˆσ, y) =(cid:80)n
+
+yˆσ(i)
+
+log2 i.
+
+i=1
+
+i=2
+
+2.2 Multivariate empirical risk minimization
+
+Empirical risk minimization [28] is a common supervised learning approach that seeks a predictor
+ˆP (ˆy|x) (from, e.g., a set of predictors Γ) that minimizes the loss under the empirical distribution of
+E ˜P (y,x) ˆP (ˆy|x)[loss( ˆY, Y)]. Multivariate losses are of-
+training data, denoted ˜P (y, x): min ˆP (ˆy|x)∈Γ
+ten not convex and ﬁnding the optimal solution is computationally intractable for expressive classes
+of predictors Γ typically speciﬁed by some set of parameters θ (e.g., linear discriminant functions:
+ˆP (ˆy|x) = 1 if θ · Φ(x, ˆy) > θ · Φ(x, y(cid:48)) ∀y(cid:48) (cid:54)= ˆy).
+Given these difﬁculties, convex surrogates to the multivariate loss are instead employed that are
+i loss(ˆyi, yi)). Employing the logarithmic loss,
+loss(ˆyi, yi) = − log ˆP ( ˆYi = yi) yields the logistic regression model [9]. Using the hinge loss
+yields support vector machines [5]. Structured support vector machines [27] employ a convex ap-
+proximation of the multivariate loss over a training dataset D using the hinge loss function:
+
+additive over ˆyi and yi (i.e., loss(ˆy, y) = (cid:80)
+
+i
+
+||θ||2 + α
+
+ξi such that ∀i, y(cid:48) ∈ Y, θ · [Φ(x(i), y(i)) − Φ(x(i), y(cid:48))] ≥ ∆(y(cid:48), y(i)) − ξi.
+
+min
+θ,ξi≥0
+In other words, linear parameters θ for feature functions Φ(·,·) are desired that make the example
+label y(i) have a potential value θ · Φ(x(i), y(i)) that is better than all alternative labels y(cid:48) by at
+least the multivariate loss between y(cid:48) and y(i), denoted ∆(y(cid:48), y(i)). When this is not possible for
+a particular example, a hinge loss penalty ξi is incurred that grows linearly with the difference in
+potentials. Parameter α controls a trade-off between obtaining a predictor with lower hinge loss or
+better discrimination between training examples (the margin). The size of set Y is often too large
+for explicit construction of the constraint set to be computationally tractable. Instead, constraint
+generation methods are employed to ﬁnd a smaller set of active constraints. This can be viewed as
+either ﬁnding the most-violated constraint [27] or as a loss-augmented inference problem [25]. Our
+
+(cid:88)
+
+2
+
+approach employs similar constraint generation techniques—in the inference procedure rather than
+the parameter learning procedure—to improve its efﬁciency.
+
+3 Multivariate Prediction Games
+
+We formulate a minimax game for multivariate loss optimization, describe our approach for lim-
+iting the computational complexity of solving this game, and describe algorithms for estimating
+parameters of the game and making predictions using this framework.
+
+3.1 Game formulation
+
+Following a recent adversarial formulation for classiﬁcation [1], we view multivariate prediction as
+a two-player game between player ˆY making predictions and player ˇY determining the evaluation
+distribution. Player ˆY ﬁrst stochastically chooses a predictive distribution of variable assignments,
+ˆP (ˆy|x), to maximize a multivariate performance measure, then player ˇY stochastically chooses
+an evaluation distribution, ˇP (ˇy|x), that minimizes the performance measure. Further, player ˇY
+must choose the relevant items in a way that (approximately) matches in expectation with a set of
+statistics, Φ(x, y), measured from labeled data. We denote this set as Ξ.
+Deﬁnition 1. The multivariate prediction game (MPG) for n predicted variables is:
+
+max
+ˆP (ˆy|x)
+
+min
+
+ˇP (ˇy|x)∈Ξ
+
+E ˜P (x) ˆP (ˆy|x) ˇP (ˇy|x)
+
+score( ˆY, ˇY)
+
+,
+
+(cid:2)Φ(X, ˇY)(cid:3) = E ˜P (y,x) [Φ(X, Y)] .
+
+where ˆP (ˆy|x) and ˇP (ˇy|x) are distributions over combinations of labels for the n predicted vari-
+ables and the set Ξ corresponds to the constraint: E ˜P (x)P (ˇy|x)
+Since the set Ξ constrains the adversary’s multivariate label distribution over the entire distribution
+of inputs ˜P (x), solving this game directly is impractical when the number of training examples is
+large. Instead, we employ the method of Lagrange multipliers in Theorem 1, which allows the set
+of games to be independently solved given Lagrange multipliers θ.
+Theorem 1. The multivariate prediction game’s value (Deﬁnition 1) can be equivalently obtained
+by solving a set of unconstrained maximin games parameterized by Lagrange multipliers θ:
+
+(cid:104)
+
+(cid:105)
+
+max
+ˆP (ˆy|x)
+
+min
+
+ˇP (ˇy|x)∈Ξ
+
+E ˜P (x) ˆP (ˆy|x) ˇP (ˇy|x)
+
+E ˜P (y,x) [θ · Φ(X, Y)] +
+
+(b)
+= max
+
+θ
+
+(1)
+
+(cid:105)
+
+(2)
+
+score( ˆY, ˇY)
+
+= min
+
+ˇP (ˇy|x)∈Ξ
+
+score( ˆY, ˇY)
+
+(cid:104)
+(cid:88)
+
+x∈X
+
+(cid:105) (a)
+
+(cid:104)
+
+ ,
+
+E ˜P (x) ˆP (ˆy|x) ˇP (ˇy|x)
+
+max
+ˆP (ˆy|x)
+
+score(ˆy, ˇy) − θ · Φ(x, ˇy)
+(cid:124)
+(cid:125)
+
+(cid:123)(cid:122)
+
+CCC(cid:48)
+
+ˆy,ˇy
+
+˜P (x) min
+ˇP (ˇy|x)
+
+max
+ˆP (ˆy|x)
+
+where: Φ(x, y) is a vector of features characterizing the set of prediction variables {yi} and pro-
+vided contextual variables {xi} each related to predicted variable yi.
+
+Proof (sketch). Equality (a) is a consequence of duality in zero-sum games [29]. Equality (b) is
+obtained by writing the Lagrangian and taking the dual. Strong Lagrangian duality is guaranteed
+when a feasible solution exists on the relative interior of the convex constraint set Ξ [2]. (A small
+amount of slack corresponds to regularization of the θ parameter in the dual and guarantees the
+strong duality feasibility requirement is satisﬁed in practice.)
+
+The resulting game’s payoff matrix can be expressed as the original game scores of Eq. (1) aug-
+mented with Lagrangian potentials. The combination deﬁnes a new payoff matrix with entries
+(cid:48)
+ˆy,ˇy = score(ˆy, ˇy) − θ · Φ(x, ˇy), as shown in Eq. (2).
+CCC
+
+3.2 Example multivariate prediction games and small-scale solutions
+
+ble 1 for three variables. We employ additive feature functions, Φ(x, ˇy) =(cid:80)n
+
+Examples of the Lagrangian payoff matrices for the P@2, F-score, and DCG games are shown in Ta-
+i=1 φ(xi) I(ˇyi = 1),
+
+3
+
+Table 1: The payoff matrices for the zero-sum games between player ˇY choosing columns and
+player ˆY choosing rows with three variables for: precision at k (top); F-score (middle) and DCG
+with binary relevance values, ˇyi ∈ {0, 1}, and we let lg 3 (cid:44) log2 3 (bottom).
+
+P@2 000
+011
+0
+101
+0
+110
+0
+000
+F1
+000
+1
+001
+0
+010
+0
+011
+0
+100
+0
+101
+0
+110
+0
+111
+0
+DCG 000
+123
+0
+132
+0
+213
+0
+231
+0
+312
+0
+321
+0
+
+2
+
+1
+
+001
+2−ψ3
+1
+2−ψ3
+0−ψ3
+001
+0−ψ3
+1−ψ3
+0−ψ3
+3−ψ3
+0−ψ3
+3−ψ3
+0−ψ3
+2−ψ3
+001
+2−ψ3
+1
+lg 3−ψ3
+2−ψ3
+lg 3−ψ3
+1−ψ3
+1−ψ3
+
+2
+
+1
+
+1
+
+1
+
+1
+
+011
+
+1
+
+1−ψ2−ψ3
+2−ψ2−ψ3
+2−ψ2−ψ3
+
+1
+
+011
+
+2
+
+2
+
+0−ψ2 − ψ3
+3−ψ2 − ψ3
+3−ψ2 − ψ3
+1−ψ2 − ψ3
+0−ψ2 − ψ3
+2−ψ2 − ψ3
+2−ψ2 − ψ3
+5−ψ2 − ψ3
+
+1
+
+1
+
+4
+
+2
+
+1
+
+010
+2−ψ2
+1
+0−ψ2
+2−ψ2
+010
+0−ψ2
+0−ψ2
+1−ψ2
+3−ψ2
+0−ψ2
+0−ψ2
+3−ψ2
+2−ψ2
+010
+lg 3−ψ2
+1
+2 − ψ2
+1−ψ2
+1−ψ2
+2 − ψ2
+lg 3−ψ2 1+ 1
+
+2 + 1
+2 + 1
+
+1+ 1
+
+1
+
+2
+
+1
+
+1
+
+1
+
+1
+
+1
+
+3
+
+011
+lg 3−ψ2−ψ3
+lg 3−ψ2−ψ3
+2−ψ2−ψ3
+lg 3−ψ2−ψ3
+2−ψ2−ψ3
+lg 3−ψ2−ψ3
+
+3
+
+101
+
+1
+
+2−ψ1−ψ3
+1−ψ1−ψ3
+2−ψ1−ψ3
+
+1
+
+101
+
+2
+
+1
+
+0−ψ1−ψ3
+3−ψ1−ψ3
+0−ψ1−ψ3
+2−ψ1−ψ3
+3−ψ1−ψ3
+1−ψ1−ψ3
+2−ψ1−ψ3
+5−ψ1−ψ3
+
+2
+
+1
+
+4
+
+101
+
+1
+
+1
+
+100
+0−ψ1
+2−ψ1
+2−ψ1
+100
+0−ψ1
+0−ψ1
+0−ψ1
+0−ψ1
+1−ψ1
+3−ψ1
+3−ψ1
+2−ψ1
+100
+1−ψ1
+1−ψ1
+1+ 1
+lg 3−ψ1
+2 + 1
+1
+2−ψ1
+2 + 1
+lg 3−ψ1 1+ 1
+2−ψ1
+
+2
+
+2
+
+1
+
+1
+
+1
+
+1
+
+1
+
+1
+
+110
+
+1
+
+2−ψ1−ψ2
+2−ψ1−ψ2
+1−ψ1−ψ2
+
+1
+
+111
+
+1−ψ1−ψ2−ψ3
+1−ψ1−ψ2−ψ3
+1−ψ1−ψ2−ψ3
+
+110
+
+1
+
+2
+
+0−ψ1−ψ2
+0−ψ1−ψ2
+3−ψ1−ψ2
+2−ψ1−ψ2
+3−ψ1−ψ2
+2−ψ1−ψ2
+1−ψ1−ψ2
+5−ψ1−ψ2
+
+1
+
+2
+
+4
+
+111
+
+4
+
+1
+
+1
+
+0−ψ1−ψ2 − ψ3
+2−ψ1−ψ2 − ψ3
+2−ψ1−ψ2 − ψ3
+5−ψ1−ψ2 − ψ3
+2−ψ1−ψ2 − ψ3
+5−ψ1−ψ2 − ψ3
+5−ψ1−ψ2 − ψ3
+1−ψ1−ψ2 − ψ3
+
+1
+
+4
+
+4
+
+110
+
+3
+
+3
+
+1+ 1
+
+2−ψ1−ψ3
+lg 3−ψ1−ψ3
+lg 3−ψ1−ψ3 1+ 1
+lg 3−ψ1−ψ3
+lg 3−ψ1−ψ3
+2−ψ1−ψ3
+
+lg 3−ψ1−ψ2
+2−ψ1−ψ2
+lg 3−ψ1−ψ2
+2−ψ1−ψ2
+lg 3−ψ1−ψ2
+lg 3−ψ1−ψ2
+
+2 + 1
+2 + 1
+
+3
+
+1
+
+3
+
+1
+
+111
+
+3
+
+3
+
+3
+
+lg 3−ψ1−ψ2−ψ3
+lg 3−ψ1−ψ2−ψ3
+lg 3−ψ1−ψ2−ψ3
+lg 3−ψ1−ψ2−ψ3
+lg 3−ψ1−ψ2−ψ3
+lg 3−ψ1−ψ2−ψ3
+
+2 + 1
+2 + 1
+2 + 1
+2 + 1
+2 + 1
+2 + 1
+
+3
+
+3
+
+3
+
+in these examples (with indicator function I(·)). We compactly represent the Lagrangian potential
+terms for each game with potential variables, ψi (cid:44) θ · φ(Xi = xi) when ˇYi = 1 (and 0 otherwise).
+Zero-sum games such as these can be solved using a pair of linear programs that have a constraint
+for each pure action (set of variable assignments) in the game [29]:
+
+v such that v ≤(cid:88)
+v such that v ≥(cid:88)
+
+ˆy∈Y
+
+ˇy∈Y
+
+max
+
+v, ˆP (ˆy|x)≥0
+
+min
+
+v, ˇP (ˇy|x)≥0
+
+(cid:48)
+
+ˆy,ˇy ∀ˆy ∈ Y and (cid:88)
+ˆy,ˇy ∀ˇy ∈ Y and (cid:88)
+
+ˆy∈Y
+
+(cid:48)
+
+ˇy∈Y
+
+ˆP (ˆy|x)CCC
+
+ˇP (ˇy|x)CCC
+
+ˆP (ˆy|x) = 1;
+
+ˇP (ˇy|x) = 1,
+
+(3)
+
+(4)
+
+(cid:48) is the Lagrangian-augmented payoff and v is the value of the game. The second player to
+where CCC
+act in a zero-sum game can maximize/minimize using a pure strategy (i.e., a single value assignment
+to all variables). Thus, these LPs consider only the set of pure strategies of the opponent to ﬁnd the
+ﬁrst player’s mixed equilibrium strategy. The equilibrium strategy for the predictor is a distribution
+over rows and the equilibrium strategy for the adversary is a distribution over columns.
+
+The size of each game’s payoff matrix grows exponentially with the number of variables, n: (2n)(cid:0)n
+
+k
+for the precision at k game; (2n)2 for the F-score game; and (n! kn) for the DCG game with k
+possible relevance levels. These sizes make explicit construction of the game matrix impractical for
+all but the smallest of problems.
+
+(cid:1)
+
+3.3 Large-scale strategy inference
+
+More efﬁcient methods for obtaining Nash equilibria are needed to scale our MPG approach to
+large prediction tasks with exponentially-sized payoff matrices. Though much attention has focused
+on efﬁciently computing -Nash equilibria (e.g., in O(1/) time or O(ln(1/)) time [8]), which
+guarantee each player a payoff within  of optimal, we employ an approach for ﬁnding an exact
+equilibrium that works well in practice despite not having as strong theoretical guarantees [20].
+
+4
+
+Consider the reduced game matrices of Table 2. The Nash equi-
+librium for the precision at k game with Lagrangian potentials
+
+(cid:3) and ˇP (ˇy|x) =
+(cid:3) ; with a
+
+2
+9
+
+2
+9
+
+1
+3
+
+2
+9
+
+3
+
+ψ1 = ψ2 = ψ3 = 0.4 is: ˆP (ˆy|x) = (cid:2) 1
+(cid:2) 1
+(cid:3) ; with a game value of − 2
+(cid:3) and ˇP (ˇy|x) = (cid:2) 1
+0) is: ˆP (ˆy|x) = (cid:2) 1
+
+1
+3
+
+3
+
+1
+3
+
+2
+3
+
+3
+
+1
+3
+
+15. The Nash equilibrium for
+3
+the reduced F-score game with no learning (i.e., ψ1 = ψ2 = ψ3 =
+
+game value of 2
+3. The reduced game equilibrium is also an equilib-
+rium of the original game. Though the exact size of the subgame
+and its speciﬁc actions depends on the values of ψ, often a compact
+sub-game with identical equilibrium or close approximation exists
+[18]. Motivated by the compactness of the reduced game, we em-
+ploy a constraint generation approach known as the double oracle
+algorithm [20] to iteratively construct an appropriate reduced game
+that provides the correct equilibrium but avoids the computational
+complexity of the original exponentially sized game.
+
+Table 2: The reduced preci-
+sion at k game with ψ1 =
+ψ2 = ψ3 = 0.4 (top) and F-
+score game with ψ1 = ψ2 =
+ψ3 = 0 (bottom).
+
+101
+110
+011
+-0.3 -0.3
+0.2
+011
+-0.3
+101 -0.3
+0.2
+111 -0.3 -0.3
+0.2
+
+000 001 010 100
+0
+1
+1
+1
+2
+
+1
+1
+2
+
+1
+1
+2
+
+000
+111
+
+(cid:16) ˆP (ˆy|x), ˇP (ˇy|x)
+(cid:17)
+
+(cid:46) Using Eq. (2) for the sub-game matrix of ˆS × ˇS
+
+(cid:48) ← buildPayoffMatrix( ˆS, ˇS, ψ)
+(cid:48))
+[ ˆP (ˆy|x), vNash1] ← solveZeroSumGame ˆY (CCC
+[ˇa, ˇvBR] ← ﬁndBestResponseAction(P (ˆy|x), ψ)
+if (vNash1 (cid:54)= ˇvBR) then
+
+Algorithm 1 Constraint generation game solver
+Input: Lagrange potentials for each variable, ψ = {ψ1, ψ2, . . . , ψn}; initial action sets ˆS0 and ˇS0
+Output: Nash equilibrium,
+1: Initialize Player ˆY ’s action set ˆS ← ˆS0 and Player ˇY ’s action set ˇS ← ˇS0
+2: CCC
+3: repeat
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15:
+16: until (vNash1 = vNash2 = ˆvBR = ˇvBR)
+17: return [ ˆP (ˆy|x), ˇP (ˇy|x)]
+
+ˇS ← ˇS ∪ ˇa
+(cid:48) ← buildPayoffMatrix( ˆS, ˇS, ψ)
+CCC
+end if
+(cid:48))
+[ ˇP (ˇy|x), vNash2] ← solveZeroSumGame ˇY (CCC
+[ˆa, ˆvBR] ← ﬁndBestResponseAction(P (ˇy|x), ψ)
+if (vNash2 (cid:54)= ˆvBR) then
+
+ˆS ← ˆS ∪ ˆa
+(cid:48) ← buildPayoffMatrix( ˆS, ˇS, ψ)
+CCC
+end if
+
+(cid:46) Using the LP of Eq. (3)
+(cid:46) ˇa denotes the best response action
+(cid:46) Check if best response provides improvement
+
+(cid:46) Stop if neither best response provides improvement
+
+(cid:46) Add new column to game matrix
+
+(cid:46) Add new row to game matrix
+
+(cid:46) Using the LP of Eq. (4)
+
+Neither player can improve upon their strategy with additional pure
+strategies when Algorithm 1 terminates, thus the mixed strategies it returns are a Nash equilibrium
+pair [20]. Additionally, the algorithm is efﬁcient in practice so long as each player’s strategy is
+compact (i.e., the number of actions with non-zero probability is a polynomial subset of the la-
+bel combinations) and best responses to opponents’ strategies can be obtained efﬁciently (i.e., in
+polynomial time) for each player. Additionally, this algorithm can be modiﬁed to ﬁnd approximate
+equilibria by limiting the number of actions for each player’s set ˆS and ˇS.
+
+3.4 Efﬁciently computing best responses
+
+The tractability of our approach largely rests on our ability to efﬁciently ﬁnd best responses to oppo-
+(cid:48)
+nent strategies: argmaxˆy∈ ˆY E ˇP (ˇy|x)[CCC
+ˆY ,ˇy]. For some combinations
+of loss functions and features, ﬁnding the best response is trivial using, e.g., a greedy selection algo-
+rithm. Other loss function/feature combinations require specialized algorithms or are NP-hard. We
+illustrate each situation.
+
+(cid:48)
+ˆy, ˇY ] and argminˇy∈ ˇY E ˆP (ˆy|x)[CCC
+
+Precision at k best response Many best responses can be obtained using greedy algorithms that
+are based on marginal probabilities of the opponent’s strategy. For example, the expected payoff in
+
+5
+
+the precision at k game for the estimator player setting ˆyi = 1 is ˇP (ˇyi = 1|x). Thus, the set of top k
+variables with the largest marginal label probability provides the best response. For the adversary’s
+best response, the Lagrangian terms must also be included. Since k is a known variable, as long as
+the value of each included term, ˆP (ˆyi = 1,||ˆy||1 = k|x) − kψi, is negative, the sum is the smallest,
+and the corresponding response is the best for the adversary.
+
+F-score game best response We leverage a recently developed method for efﬁciently maximizing
+the F-score when a distribution over relevant documents is given [6]. The key insight is that the
+problem can be separated into an inner greedy maximization over item sets of a certain size k and an
+outer maximization to select the best set size k from {0, . . . , n}. This method can be directly applied
+to ﬁnd the best response of the estimator player, ˆY , since the Lagrangian terms of the cost matrix
+are invariant to the choice of ˆy. Algorithm 2 obtains the best response for the adversary player, ˇY ,
+using slight modiﬁcations to incorporate the Lagrangian potentials into the objective function.
+
+2(cid:80)n
+
+s, k ∈ {1, ..., n}
+
+Algorithm 2 Lagrangian-augmented F-measure Maximizer for adversary player ˇY
+Input: vector ˆP of estimator probabilities and Lagrange potentials ψ (ψ1, ψ2, ..., ψn)
+1: deﬁne matrix WWW with element WWW s,k = 1
+s+k ,
+2: construct matrix FFF = ˆP × WWW − 1
+2 ψT × 1n
+3: for k = 1 to n do
+solve the inner optimization problem:
+4:
+a(k)∗
+5:
+by setting a(k)
+6:
+store a value of E
+7:
+8: end for
+9: for k = 0 take a(k)∗
+10: solve the outer optimization problem:
+11: a∗ = argmina∈{a(0)∗
+12: return a∗ and E
+y∼p( ˆY|x)[FFF (y, a∗)]
+
+y∼p( ˆY|x)[FFF (y, a(k)∗
+= 0n, and E
+,...,a(n)∗} E
+
+y∼P ( ˆY|x)[FFF (y, 0n)] = p( ˆY = 0n|x)
+
+(cid:46) Ak = {a ∈ {0, 1}n|(cid:80)n
+
+i=1 ai = k}
+i = 1 for the k-th column of FFF ’s smallest k elements, and ai = 0 for the rest;
+
+(cid:46) 1n is the all ones 1 × n vector
+
+)] = 2(cid:80)n
+
+y∼p( ˆY|x)[FFF (y, a)]
+
+= argmina∈Ak
+
+i=1 a(k)∗
+
+i=1 aifik
+
+fik
+
+i
+
+orderings, ˆP (ˆσ−1(i) > ˆσ−1(j)) (cid:44) (cid:80)
+
+Order inversion best response Another common loss measure when comparing two rankings is
+the number of pairs of items with inverted order across rankings (i.e., one variable may occur before
+another in one ranking, but not in the other ranking). Only the marginal probabilities of pairwise
+ˆP (ˆσ) I(σ−1(i) > σ−1(j)), are needed to construct the
+portion of the payoff received for ˇσ ranking item i over item j, ˆP (ˆσ−1(i) > ˆσ−1(j))(1 + ψi>j),
+where ψi>j is a Lagrangian potential based on pair-wise features for ranking item i over item j.
+One could construct a fully connected directed graph with edges weighted by these portions of the
+payoff for ranking pairs of items. The best response for ˇσ corresponds to a set of acyclic edges
+with the smallest sum of edge weights. Unfortunately, this problem is NP-hard in general because
+the NP-complete minimum feedback arc set problem [15], which seeks to form an acyclic graph by
+removing the set of edges with the minimal sum of edge weights, can be reduced to it.
+
+ˆσ
+
+(cid:33)
+
+P (ˇy|x)
+
+(cid:32) n(cid:88)
+
+DCG best response Although we cannot ﬁnd an efﬁcient algorithm to get the best response using
+order inversion, solving best response of DCG has a known efﬁcient algorithm. In this problem the
+maximizer is a permutation of the documents while the minimizer is the relevance score of each
+document pair. The estimator’s best response ˆσ maximizes:
+
+(cid:88)
+ing, computing and sorting(cid:80)
+where c is a constant that has no relationship with ˆσ. Since 1/log2(i + 1) is monotonically decreas-
+ˇy P (ˇy|x)2ˇyi − 1 with descending order and greedily assign the order
+(cid:33)
+(cid:88)
+− n(cid:88)
+
+to ˆσ is optimal. The adversary’s best response using additive features minimizes:
+
+2ˇyˆσ(i) − 1
+log2(i + 1)
+
+P (ˇy|x)2ˇyˆσ(i) − 1
+
+(cid:32)(cid:88)
+
+− θ · φ(x, ˇy)
+
+(cid:32)(cid:88)
+
+θi · φi(xi, ˇyi) =
+
+− θi · φi(xi, ˇyi)
+
+log2(i + 1)
+
+n(cid:88)
+
+n(cid:88)
+
+n(cid:88)
+
+ˇy
+
+i=1
+
+=
+
+i=1
+
+P (ˆσ|x)
+
+(cid:33)
+
+− c,
+
+1
+
+ˇy
+
+2ˇyˆσ(i) − 1
+log2(i + 1)
+
+ˆσ
+
+i=1
+
+P (ˆσ|x)
+
+2ˇyi − 1
+
+log2(σ−1(i) + 1)
+
+.
+
+i=1
+
+i=1
+
+ˆσ
+
+6
+
+Thus, by using the expectation of a function of each variable’s rank, 1/(log2(σ−1(i) + 1), which is
+easily computed from ˆP (σ), each variable’s relevancy score ˇyi can be independently chosen.
+
+3.5 Parameter estimation
+
+Predictive model parameters, θ, must be chosen to ensure that the adversarial distribution is similar
+to training data. Though adversarial prediction can be posed as a convex optimization problem
+[1], the objective function is not smooth. General subgradient methods require O(1/2) iterations
+to provide an  approximation to the optima. We instead employ L-BFGS [19], which has been
+empirically shown to converge at a faster rate in many cases despite lacking theoretical guarantees
+for non-smooth objectives [16]. We also employ L2 regularization to avoid overﬁtting to the training
+data sample. The addition of the smooth regularizer often helps to improve the rate of convergence.
+The gradient in these optimizations with L2 regularization, − λ
+2||θ||2, for training dataset D =
+{(x(i), y(i))} is the difference between feature moments with additional regularization term:
+1|D|
+needed for calculating this gradient are computed via Alg. 1.
+
+(cid:17) − λθ. The adversarial strategies ˇP (·|x(i))
+
+Φ(x(i), y(i)) −(cid:80)
+
+ˇy∈Y ˇP (ˇy|x(i))Φ(x(i), ˇy)
+
+(cid:80)|D|
+
+(cid:16)
+
+j=1
+
+4 Experiments
+
+We evaluate our approach, Multivariate Prediction Games (MPG), on the three performance mea-
+sures of interest in this work: precision at k, F-score, and DCG. Our primary point of comparison
+is with structured support vector machines (SSVM)[27] to better understand the trade-offs between
+convexly approximating the loss function with the hinge loss versus adversarially approximating the
+training data using our approach. We employ an optical recognition of handwritten digits (OPTDIG-
+ITS) dataset [17] (10 classes, 64 features, 3,823 training examples, 1,797 test examples), an income
+prediction dataset (‘a4a’ ADULT1 [17] (two classes, 123 features, 3,185 training examples, 29,376
+test examples), and query-document pairs from the million query TREC 2007 (MQ2007) dataset
+of LETOR4.0 [23] (1700 queries, 41.15 documents on average per query, 46 features per docu-
+ment). Following the same evaluation method used in [27] for OPTDIGITS, the multi-class dataset
+is converted into multiple binary datasets and we report the macro-average of the performance of all
+3 of the training data as a holdout
+classes on test data. For OPTDIGITS/ADULT, we use a random 1
+validation data to select the L2 regularization parameter trade-off C ∈ {2−6, 2−5, ..., 26}.
+We evaluate the performance of our approach and com-
+parison methods (SSVM variants2 and logistic regression
+(LR)) using precision at k, where k is half the number of
+2 P OS), and F-score. For
+positive examples (i.e. k = 1
+precision at k, we restrict the pure strategies of the adver-
+sary to select k positive labels. This prevents adversary
+strategies with no positive labels. From the results in Ta-
+ble 3, we see that our approach, MPG, works better than
+SSVM on the OPTDGITS datasets: slightly better on pre-
+cision at k and more signiﬁcantly better on F-measure.
+For the ADULT dataset, MPG provides equivalent per-
+formance for precision at k and better performance on F-
+measure. The nature of the running time required for validation and testing is very different for
+SSVM, which must ﬁnd the maximizing set of variable assignments, and MPG, which must interac-
+tively construct a game and its equilibrium. Model validation and testing require ≈ 30 seconds for
+SSVM on the OPTDIGITS dataset and ≈ 3 seconds on the ADULT dataset, while requiring ≈ 9
+seconds and ≈ 25 seconds for MPG precision at k and ≈ 1397 seconds and ≈ 252 seconds for
+MPG F-measure optimization, respectively. For precision at k, MPG is within an order of magni-
+
+Precision@k OPTDIGITS ADULT
+0.805
+0.638
+0.805
+OPTDIGITS ADULT
+0.697
+0.673
+0.639
+
+Table 3: Precision at k (top) and F-score
+performance (bottom).
+
+MPG
+SSVM
+SSVM’
+F-score
+MPG
+SSVM
+
+0.920
+0.915
+0.914
+
+0.990
+0.956
+0.989
+
+LR
+
+1 http://www.csie.ntu.edu.tw/˜cjlin/libsvmtools/datasets/binary.html)
+2For precision at k, the original SSVM’s implementation uses the restriction k during training, but not
+during testing. We modiﬁed the code by ordering SSVM’s prediction value for each test example, and select
+the top k predictions as positives, the rest are considered as negatives. We denote the original implementation
+as SSVM, and the modiﬁed version as SSVM’.
+
+7
+
+tude (better for OPTDIGITS, worse for ADULT). For the more difﬁcult problem of maximizing the
+F-score of ADULT over 29, 376 test examples, the MPG game becomes quite large and requires
+signiﬁcantly more computational time. Though our MPG method is not as ﬁnely optimized as ex-
+isting SSVM implementations, this difference in run times will remain as the game formulation is
+inherently more computationally demanding for difﬁcult prediction tasks.
+We compare the performance of our approach and com-
+parison methods using ﬁve-fold cross validation on the
+MQ2007 dataset. We measure performance using Nor-
+malized DCG (NDCG), which divides the realized DCG
+by the maximum possible DCG for the dataset, based on a
+slightly different variant of DCG employed by LETOR4.0:
+. The compari-
+son methods are: RankSVM-Struct [13], part of SVMstruct
+which uses structured SVM to predict the rank; ListNet
+[3], a list-wise ranking algorithm employing cross en-
+tropy loss; AdaRank-NDCG [30], a boosting method us-
+ing ‘weak rankers’ and data reweighing to achieve good
+NDCG performance; AdaRank-MAP uses Mean Average
+Precision (MAP) rather than NDCG; and RankBoost [7],
+which reduces ranking to binary classiﬁcation problems on instance pairs.
+
+DCG(cid:48)(cid:48)(ˆσ, y) = 2yˆσ(1) − 1 +(cid:80)n
+
+Figure 1: NDCG@K as K increases.
+
+2yˆσ(i)−1
+
+i=2
+
+log2 i
+
+Table 4: MQ2007 NDCG Results.
+
+Method
+MPG
+
+RankSVM
+
+ListNet
+
+AdaRank-NDCG
+AdaRank-MAP
+
+RankBoost
+
+Mean NDCG
+
+0.5220
+0.4966
+0.4988
+0.4914
+0.4891
+0.5003
+
+Table 4 reports the NDCG@K averaged over all values of K
+(between 1 and, on average 41) while Figure 1 reports the re-
+sults for each value of K between 1 and 10. From this, we can
+see that our MPG approach provides better rankings on aver-
+age than the baseline methods except when K is very small
+(K = 1, 2). In other words, the adversary focuses most of its
+effort in reducing the score received from the ﬁrst item in the
+ranking, but at the expense of providing a better overall NDCG
+score for the ranking as a whole.
+
+5 Discussion
+
+We have extended adversarial prediction games [1] to settings with multivariate performance mea-
+sures in this paper. We believe that this is an important step in demonstrating the beneﬁts of this
+approach in settings where structured support vector machines [14] are widely employed. Our fu-
+ture work will investigate improving the computational efﬁciency of adversarial methods and also
+incorporating structured statistical relationships amongst variables in the constraint set in addition
+to multivariate performance measures.
+
+Acknowledgments
+
+This material is based upon work supported by the National Science Foundation under Grant No.
+#1526379, Robust Optimization of Loss Functions with Application to Active Learning.
+
+References
+[1] Kaiser Asif, Wei Xing, Sima Behpour, and Brian D. Ziebart. Adversarial cost-sensitive classiﬁcation. In
+
+Proceedings of the Conference on Uncertainty in Artiﬁcial Intelligence, 2015.
+
+[2] Stephen Boyd and Lieven Vandenberghe. Convex optimization. Cambridge university press, 2004.
+[3] Zhe Cao, Tao Qin, Tie-Yan Liu, Ming-Feng Tsai, and Hang Li. Learning to rank: from pairwise approach
+to listwise approach. In Proceedings of the International Conference on Machine Learning, pages 129–
+136. ACM, 2007.
+
+[4] Corinna Cortes and Mehryar Mohri. AUC optimization vs. error rate minimization. In Advances in Neural
+
+Information Processing Systems, pages 313–320, 2004.
+
+[5] Corinna Cortes and Vladimir Vapnik. Support-vector networks. Machine learning, 20(3):273–297, 1995.
+
+8
+
+[6] Krzysztof J Dembczynski, Willem Waegeman, Weiwei Cheng, and Eyke H¨ullermeier. An exact algorithm
+for F-measure maximization. In Advances in Neural Information Processing Systems, pages 1404–1412,
+2011.
+
+[7] Yoav Freund, Raj Iyer, Robert E Schapire, and Yoram Singer. An efﬁcient boosting algorithm for com-
+
+bining preferences. The Journal of machine learning research, 4:933–969, 2003.
+
+[8] Andrew Gilpin, Javier Pe˜na, and Tuomas Sandholm. First-order algorithm with o (ln (1/e)) convergence
+for e-equilibrium in two-person zero-sum games. In AAAI Conference on Artiﬁcial Intelligence, pages
+75–82, 2008.
+
+[9] Peter D. Gr¨unwald and A. Phillip Dawid. Game theory, maximum entropy, minimum discrepancy, and
+
+robust Bayesian decision theory. Annals of Statistics, 32:1367–1433, 2004.
+
+[10] Tamir Hazan, Joseph Keshet, and David A McAllester. Direct loss minimization for structured prediction.
+
+In Advances in Neural Information Processing Systems, pages 1594–1602, 2010.
+
+[11] Klaus-Uwe Hoffgen, Hans-Ulrich Simon, and Kevin S Vanhorn. Robust trainability of single neurons.
+
+Journal of Computer and System Sciences, 50(1):114–125, 1995.
+
+[12] Martin Jansche. Maximum expected F-measure training of logistic regression models. In Proceedings of
+the Conference on Human Language Technology and Empirical Methods in Natural Language Process-
+ing, pages 692–699. Association for Computational Linguistics, 2005.
+
+[13] Thorsten Joachims. Optimizing search engines using clickthrough data. In Proceedings of the Interna-
+
+tional Conference on Knowledge Discovery and Data Mining, pages 133–142. ACM, 2002.
+
+[14] Thorsten Joachims. A support vector method for multivariate performance measures. In Proceedings of
+
+the International Conference on Machine Learning, pages 377–384. ACM, 2005.
+
+[15] Richard M. Karp. Reducibility among combinatorial problems. Springer, 1972.
+[16] Adrian S Lewis and Michael L Overton. Nonsmooth optimization via BFGS. 2008.
+[17] M. Lichman. UCI machine learning repository, 2013.
+[18] Richard J Lipton and Neal E Young. Simple strategies for large zero-sum games with applications to
+In Proc. of the ACM Symposium on Theory of Computing, pages 734–740. ACM,
+
+complexity theory.
+1994.
+
+[19] Dong C Liu and Jorge Nocedal. On the limited memory BFGS method for large scale optimization.
+
+Mathematical programming, 45(1-3):503–528, 1989.
+
+[20] H Brendan McMahan, Geoffrey J Gordon, and Avrim Blum. Planning in the presence of cost functions
+controlled by an adversary. In Proceedings of the International Conference on Machine Learning, pages
+536–543, 2003.
+
+[21] David R Musicant, Vipin Kumar, and Aysel Ozgur. Optimizing F-measure with support vector machines.
+
+In FLAIRS Conference, pages 356–360, 2003.
+
+[22] Shameem Puthiya Parambath, Nicolas Usunier, and Yves Grandvalet. Optimizing F-measures by cost-
+sensitive classiﬁcation. In Advances in Neural Information Processing Systems, pages 2123–2131, 2014.
+
+[23] Tao Qin and Tie-Yan Liu. Introducing LETOR 4.0 datasets. arXiv preprint arXiv:1306.2597, 2013.
+[24] Mani Ranjbar, Greg Mori, and Yang Wang. Optimizing complex loss functions in structured prediction.
+
+In Proceedings of the European Conference on Computer Vision, pages 580–593. Springer, 2010.
+
+[25] Ben Taskar, Vassil Chatalbashev, Daphne Koller, and Carlos Guestrin. Learning structured prediction
+models: A large margin approach. In Proceedings of the International Conference on Machine Learning,
+pages 896–903. ACM, 2005.
+
+[26] Flemming Topsøe. Information theoretical optimization techniques. Kybernetika, 15(1):8–27, 1979.
+[27] Ioannis Tsochantaridis, Thomas Hofmann, Thorsten Joachims, and Yasemin Altun. Support vector ma-
+chine learning for interdependent and structured output spaces. In Proceedings of the International Con-
+ference on Machine Learning, page 104. ACM, 2004.
+
+[28] Vladimir Vapnik. Principles of risk minimization for learning theory. In Advances in Neural Information
+
+Processing Systems, pages 831–838, 1992.
+
+[29] John von Neumann and Oskar Morgenstern. Theory of Games and Economic Behavior. Princeton Uni-
+
+versity Press, 1947.
+
+[30] Jun Xu and Hang Li. Adarank: a boosting algorithm for information retrieval. In Proc. of the International
+
+Conference on Research and Development in Information Retrieval, pages 391–398. ACM, 2007.
+
+9
+
+

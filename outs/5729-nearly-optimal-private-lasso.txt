@@ -1,0 +1,841 @@
+Nearly-Optimal Private LASSO∗
+
+Kunal Talwar
+Google Research
+
+kunal@google.com
+
+Abhradeep Thakurta
+(Previously) Yahoo! Labs
+
+guhathakurta.abhradeep@gmail.com
+
+Li Zhang
+
+Google Research
+
+liqzhang@google.com
+
+Abstract
+
+We present a nearly optimal differentially private version of the well known
+LASSO estimator. Our algorithm provides privacy protection with respect to each
+training example. The excess risk of our algorithm, compared to the non-private
+
+version, is (cid:101)O(1/n2/3), assuming all the input data has bounded (cid:96)∞ norm. This
+
+is the ﬁrst differentially private algorithm that achieves such a bound without the
+polynomial dependence on p under no additional assumptions on the design ma-
+trix.
+In addition, we show that this error bound is nearly optimal amongst all
+differentially private algorithms.
+
+1
+
+Introduction
+
+A common task in supervised learning is to select the model that best ﬁts the data. This is frequently
+achieved by selecting a loss function that associates a real-valued loss with each datapoint d and
+model θ and then selecting from a class of admissible models, the model θ that minimizes the
+average loss over all data points in the training set. This procedure is commonly referred to as
+Empirical Risk Minimization(ERM).
+The availability of large datasets containing sensitive information from individuals has motivated the
+study of learning algorithms that guarantee the privacy of individuals contributing to the database. A
+rigorous and by-now standard privacy guarantee is via the notion of differential privacy. In this work,
+we study the design of differentially private algorithms for Empirical Risk Minimization, continuing
+a long line of work. (See [2] for a survey.)
+In particular, we study adding privacy protection to the classical LASSO estimator, which has been
+widely used and analyzed. We ﬁrst present a differentially private optimization algorithm for the
+LASSO estimator. The algorithm is the combination of the classical Frank-Wolfe algorithm [15]
+and the exponential mechanism for guaranteeing the privacy [21]. We then show that our algorithm
+achieves nearly optimal risk among all the differentially private algorithms. This lower bound proof
+relies on recently developed techniques with roots in Cryptography [4, 14],
+(cid:80)
+Consider the training dataset D consisting of n pairs of data di = (xi, yi) where xi ∈ Rp, usually
+called the feature vector, and yi ∈ R, the prediction. The LASSO estimator, or the sparse linear
+regression, solves for θ∗ = argminθ L(θ; di) = 1
+i |xi · θ − yi|2 subject to (cid:107)θ(cid:107)1 ≤ c. To simplify
+presentation, we assume c = 1, but our results directly extend to general c. The (cid:96)1 constraint tends to
+induce sparse θ∗ so is widely used in the high dimensional setting when p (cid:29) n. Here, we will study
+approximating the LASSO estimation with minimum possible error while protecting the privacy of
+each individual di. Below we deﬁne the setting more formally.
+
+n
+
+∗Part of this work was done at Microsoft Research Silicon Valley Campus.
+
+1
+
+Problem deﬁnition: Given a data set D = {d1,··· , dn} of n samples from a domain D, a constraint
+set C ⊆ Rp, and a loss function L : C ×D → R, for any model θ, deﬁne its excess empirical risk as
+
+n(cid:88)
+
+i=1
+
+n(cid:88)
+
+i=1
+
+R(θ; D)
+
+def
+=
+
+1
+n
+
+L(θ; di) − min
+θ∈C
+
+1
+n
+
+L(θ; di).
+
+(1)
+
+For LASSO, the constraint set is the (cid:96)1 ball, and the loss is the quadratic loss function. We deﬁne
+the risk of a mechanism A on a data set D as R(A; D) = E[R(A(D); D)], where the expectation
+is over the internal randomness of A, and the risk R(A) = maxD∈Dn R(A; D) is the maximum
+risk over all the possible data sets. Our objective is then to design a mechanism A which preserves
+(, δ)-differential privacy (Deﬁnition 1.3) and achieves as low risk as possible. We call the minimum
+achievable risk as privacy risk, deﬁned as minA R(A), where the min is over all (, δ)-differentially
+private mechanisms A.
+There has been much work on studying the privacy risk for the LASSO estimator. However, all the
+previous results either need to make strong assumption about the input data or have polynomial de-
+pendence on the dimension p. First [20] and then [24] studied the LASSO estimator with differential
+privacy guarantee. They showed that one can avoid the polynomial dependence on p in the excess
+empirical risk if the data matrix X satisfy the restricted strong convexity and mutual incoherence
+properities. While such assumptions seem necessary to prove that LASSO recovers the exact sup-
+port in the worst case, they are often violated in practice, where LASSO still leads to useful models.
+It is therefore desirable to design and analyze private versions of LASSO in the absence of such as-
+sumptions. In this work, we do so by analyzing the loss achieved by the private optimizer, compared
+to the true optimizer.
+We make primarily two contributions in this paper. First we present an algorithm that achieves
+
+the privacy risk of (cid:101)O(1/n2/3) for the LASSO problem1. Compared to the previous work, we only
+
+assume that the input data has bounded (cid:96)∞ norm. In addition, the above risk bound only has log-
+arithmic dependence on p, which ﬁts particularly well for LASSO as we usually assume n (cid:28) p
+when applying LASSO. This bound is achieved by a private version of the Frank-Wolfe algorithm.
+Assuming that each data point di satisﬁes that (cid:107)di(cid:107)∞ ≤ 1, we have
+Theorem 1.1. There exists an (, δ)-differentially private algorithm A for LASSO such that
+
+(cid:32)
+
+log(np)(cid:112)log(1/δ)
+
+(cid:33)
+
+(n)2/3
+
+.
+
+R(A) = O
+
+Our second contribution is to show that, surprisingly, this simple algorithm gives a nearly tight
+bound. We show that this rather unusual n−2/3 dependence is not an artifact of the algorithm or the
+analysis, but is in fact the right dependence for the LASSO problem: no differentially private algo-
+rithm can do better! We prove a lower bound by employing ﬁngerprinting codes based techniques
+developed in [4, 14].
+Theorem 1.2. For the sparse linear regression problem where (cid:107)xi(cid:107)∞ ≤ 1, for  = 0.1 and δ =
+o(1/n2), any (, δ)-differentially private algorithm A must have
+R(A) = Ω(1/(n log n)2/3) .
+
+Our improved privacy risk crucially depends on the fact that the constraint set is a polytope with
+few (polynomial in dimensions) vertices. This allows us to use a private version of the Frank-Wolfe
+algorithm, where at each step, we use the exponential mechanism to select one of the vertices of
+the polytope. We also present a variant of Frank-Wolfe that uses objective perturbation instead of
+the exponential mechanism. We show that (Theorem 2.6) we can obtain a risk bound dependent on
+the Gaussian width of the constraint set, which often results in tighter bounds compared to bounds
+based, e.g., on diameter. While more general, this variant adds much more noise than the Frank-
+Wolfe based algorithm, as it is effectively publishing the whole gradient at each step. When C is not
+a polytope with a small number of vertices, one can still use the exponential mechanism as long as
+one has a small list of candidate points which contains an approximate optimizer for every direction.
+For many simple cases, for example the (cid:96)q ball with 1 < q < 2, the bounds attained in this way have
+
+1Throughout the paper, we use (cid:101)O to hide logarithmic factors.
+
+2
+
+an additional polynomial dependence on the dimension p, instead of the logarithmic dependence in
+the above result. For example, when q = 1, the upper bound from this variant has an extra factor
+of p1/3. Whereas such a dependence is provably needed for q = 2, the upper bound jump rather
+abruptly from the logarithmic dependence for q = 1 to a polynomial dependence on p for q > 1.
+We leave open the question of resolving this discontinuity and interpolating more smoothly between
+the (cid:96)1 case and the (cid:96)2 case.
+Our results enlarge the set of problems for which privacy comes “for free”. Given n samples from
+a distribution, suppose that θ∗ is the empirical risk minimizer and θpriv is the differentially private
+approximate minimizer. Then the non-private ERM algorithm outputs θ∗ and incurs expected (on the
+distribution) loss equal to the loss(θ∗, training-set) + generalization-error, where the generalization
+error term depends on the loss function, C and on the number of samples n. The differentially private
+algorithm incurs an additional loss of the privacy risk. If the privacy risk is asymptotically no larger
+than the generalization error, we can think of privacy as coming for free, since under the assumption
+of n being large enough to make the generalization error small, we are also making n large enough
+to make the privacy risk small. In the case when C is the (cid:96)1-ball, and the loss function is the squared
+loss with (cid:107)x(cid:107)∞ ≤ 1 and |y| ≤ 1, the best known generalization error bounds dominate the privacy
+risk when n = ω(log3 p) [1, Theorem 18].
+
+1.1 Related work
+
+There have been much work on private LASSO or more generally private ERM algorithms. The
+error bounds mainly depend on the shape of the constraint set and the Lipschitz condition of the loss
+function. Here we will summarize these related results. Related to our results, we distinguish two
+settings: i) the constraint set is bounded in the (cid:96)1-norm and the the loss function is 1-Lipschitz in
+the (cid:96)1-norm. (call it the ((cid:96)1/(cid:96)∞)-setting). This is directly related to our bounds on LASSO; and
+ii) the constraint set has bounded (cid:96)2 norm and the loss function is 1-Lipschitz in the (cid:96)2 norm (the
+((cid:96)2/(cid:96)2)-setting), which is related to our bounds using Gaussian width.
+
+The ((cid:96)1/(cid:96)∞)-setting: The results in this setting include [20, 24, 19, 25]. The ﬁrst two works make
+certain assumptions about the instance (restricted strong convexity (RSC) and mutual incoherence).
+Under these assumptions, they obtain privacy risk guarantees that depend logarithmically in the di-
+mensions p, and thus allowing the guarantees to be meaningful even when p (cid:29) n. In fact their
+bound of O(polylog p/n) can be better than our tight bound of O(polylog p/n2/3). However, these
+assumptions on the data are strong and may not hold in practice. Our guarantees do not require
+any such data dependent assumptions. The result of [19] captures the scenario when the constraint
+set C is the probability simplex and the loss function is a generalized linear model, but provides
+a worse bound of O(polylog p/n1/3). For the special case of linear loss functions, which are in-
+teresting primarily in the online prediction setting, the techniques of [19, 25] provide a bound of
+O(polylog p/n).
+
+The ((cid:96)2/(cid:96)2)-setting: In all the works on private convex optimization that we are aware of, either the
+excess risk guarantees depend polynomially on the dimensionality of the problem (p), or assumes
+special structure to the loss (e.g., generalized linear model [19] or linear losses [25]). Similar de-
+pendence is also present in the online version of the problem [18, 26]. [2] recently show that in
+the private ERM setting, in general this polynomial dependence on p is unavoidable. In our work
+we show that one can replace this dependence on p with the Gaussian width of the constraint set C,
+which can be much smaller.
+Effect of Gaussian width in risk minimization: Our result on general C has an dependence on
+the Gaussian width of C. This geometric concept has previously appeared in other contexts. For
+example, [1] bounds the the excess generalization error by the Gaussian width of the constraint set C.
+Recently [5] show that the Gaussian width of a constraint set C is very closely related to the number
+of generic linear measurements one needs to perform to recover an underlying model θ∗ ∈ C. The
+notion of Gaussian width has also been used by [22, 11] in the context of differentially private query
+release mechanisms but in the very different context of answering multiple linear queries over a
+database.
+
+3
+
+1.2 Background
+
+Differential Privacy: The notion of differential privacy (Deﬁnition 1.3) is by now a defacto standard
+for statistical data privacy [10, 12]. One of the reasons why differential privacy has become so
+popular is because it provides meaningful guarantees even in the presence of arbitrary auxiliary
+information. At a semantic level, the privacy guarantee ensures that an adversary learns almost
+the same thing about an individual independent of his presence or absence in the data set. The
+parameters (, δ) quantify the amount of information leakage. For reasons beyond the scope of this
+work,  ≈ 0.1 and δ = 1/nω(1) are a good choice of parameters. Here n refers to the number of
+samples in the data set.
+Deﬁnition 1.3. A randomized algorithm A is (, δ)-differentially private if, for all neighboring data
+sets D and D(cid:48) (i.e., they differ in one record, or equivalently, dH (D, D(cid:48)) = 1) and for all events S
+in the output space of A, we have
+
+Pr(A(D) ∈ S) ≤ e Pr(A(D(cid:48)) ∈ S) + δ .
+
+Here dH (D, D(cid:48)) refers to the Hamming distance.
+
+(cid:96)q-norm, q ≥ 1: For q ≥ 1, the (cid:96)q-norm for any vector v ∈ Rp is deﬁned as
+v(i) is the i-th coordinate of the vector v.
+L-Lipschitz continuity w.r.t. norm (cid:107) · (cid:107): A function Ψ : C → R is L-Lispchitz within a set C w.r.t.
+a norm (cid:107) · (cid:107) if the following holds.
+
+, where
+
+v(i)q
+
+(cid:19)1/q
+
+(cid:18) p(cid:80)
+
+i=1
+
+∀θ1, θ2 ∈ C,|Ψ(θ1) − Ψ(θ2)| ≤ L · (cid:107)θ1 − θ2(cid:107).
+
+Gaussian width of a set C: Let b ∼ N (0, Ip) be a Gaussian random vector in Rp. The Gaussian
+width of a set C is deﬁned as GC def
+
+|(cid:104)b, w(cid:105)|
+
+= Eb
+
+.
+
+(cid:21)
+
+(cid:20)
+
+sup
+w∈C
+
+2 Private Convex Optimization by Frank-Wolfe algorithm
+
+In this section we analyze a differentially private variant of the classical Frank-Wolfe algorithm [15].
+We show that for the setting where the constraint set C is a polytope with k vertices, and the loss
+function L(θ; d) is Lipschitz w.r.t. the (cid:96)1-norm, one can obtain an excess privacy risk of roughly
+O(log k/n2/3). This in particular captures the high-dimensional linear regression setting. One such
+example is the classical LASSO algorithm[27], which computes argminθ:(cid:107)θ(cid:107)1≤1
+2. In
+the usual case of |xij|,|yj| = O(1), L(θ) = 1
+2 is O(1)-Lipschitz with respect to (cid:96)1-norm,
+
+we show that one can achieve the nearly optimal privacy risk of (cid:101)O(1/n2/3).
+
+n(cid:107)Xθ − y(cid:107)2
+
+n(cid:107)Xθ−y(cid:107)2
+
+1
+
+The Frank-Wolfe algorithm [15] can be regarded as a “greedy” algorithm which moves towards
+the optimum solution in the ﬁrst order approximation (see Algorithm 1 for the description). How
+fast Frank-Wolfe algorithm converges depends on L’s “curvature”, deﬁned as follows according
+to [8, 17]. We remark that a β-smooth function on C has curvature constant bounded by β(cid:107)C(cid:107)2.
+Deﬁnition 2.1 (Curvature constant). For L : C → R, deﬁne ΓL as below.
+
+ΓL :=
+
+θ1,θ2,∈C,γ∈(0,1],θ3=θ1+γ(θ2−θ1)
+
+sup
+
+2
+
+γ2 (L(θ3) − L(θ1) − (cid:104)θ3 − θ1,(cid:53)L(θ1)(cid:105)) .
+
+Remark 1. A useful bound can be derived for a quadratic loss L(θ) = θAT Aθ + (cid:104)b, θ(cid:105). In this
+case, by [8], ΓL ≤ maxa,b∈A·C (cid:107)a − b(cid:107)2
+2. When C is centrally symmetric, we have the bound
+ΓL ≤ 4 maxθ∈C (cid:107)Aθ(cid:107)2
+2. For LASSO, A = 1√
+L(θ). The following theorem bounds the convergence rate of Frank-Wolfe
+Deﬁne θ∗ = argmin
+θ∈C
+algorithm.
+
+n X.
+
+4
+
+Algorithm 1 Frank-Wolfe algorithm
+Input: C ⊆ Rp, L : C → R, µt
+1: Choose an arbitrary θ1 from C
+2: for t = 1 to T − 1 do
+3:
+4:
+5: return θT .
+
+Compute(cid:101)θt = argminθ∈C(cid:104)(cid:53)L(θt), (θ − θt)(cid:105)
+Set θt+1 = θt + µt((cid:101)θt − θt)
+
+Theorem 2.2 ([8, 17]). If we set µt = 2/(t + 2), then L(θT ) − L(θ∗) = O(ΓL/T ) .
+While the Frank-Wolfe algorithm does not necessarily provide faster convergence compared to the
+gradient-descent based method, it has two major advantages. First, on Line 3, it reduces the problem
+to solving a minimization of linear function. When C is deﬁned by small number of vertices, e.g.
+when C is an (cid:96)1 ball, the minimization can be done by checking (cid:104)(cid:53)L(θt), x(cid:105) for each vertex x of
+C. This can be done efﬁciently. Secondly, each step in Frank-Wolfe takes a convex combination
+
+of θt and(cid:101)θt, which is on the boundary of C. Hence each intermediate solution is always inside C
+
+(sometimes called projection free), and the ﬁnal outcome θT is the convex combination of up to T
+points on the boundary of C (or vertices of C when C is a polytope). Such outcome might be desired,
+for example when C is a polytope, as it corresponds to a sparse solution. Due to these reasons
+Frank-Wolfe algorithm has found many applications in machine learning [23, 16, 8]. As we shall
+see below, these properties are also useful for obtaining low risk bounds for their private version.
+
+2.1 Private Frank-Wolfe Algorithm
+
+θ∈C(cid:104)θ, v(cid:105) ∩ S (cid:54)= ∅.
+
+We now present a private version of the Frank-Wolfe algorithm. The algorithm accesses the private
+data only through the loss function in step 3 of the algorithm. Thus to achieve privacy, it sufﬁces to
+replace this step by a private version.
+To do so, we apply the exponential mechanism [21] to select an approximate optimizer. In the case
+when the set C is a polytope, it sufﬁces to optimize over the vertices of C due to the following basic
+fact:
+Fact 2.3. Let C ⊆ Rp be the convex hull of a compact set S ⊆ Rp. For any vector v ∈ Rp,
+arg min
+Thus it sufﬁces to run the exponential mechanism to select θt+1 from amongst the vertices of C.
+This leads to a differentially private algorithm with risk logarithmically dependent on |S|. When
+|S| is polynomial in p, it leads to an error bound with log p dependence. We can bound the error
+in terms of the (cid:96)1-Lipschitz constant, which can be much smaller than the (cid:96)2-Lipschitz constant. In
+particular, as we show in the next section, the private Frank-Wolfe algorithm is nearly optimal for
+the important high-dimensional sparse linear regression problem.
+Algorithm 2 ANoise−FW(polytope): Differentially Private Frank-Wolfe Algorithm (Polytope Case)
+Input: Data set: D = {d1,··· , dn}, loss function: L(θ; D) = 1
+
+L(θ; di) (with (cid:96)1-Lipschitz
+constant L1 for L), privacy parameters: (, δ), convex set: C = conv(S) with (cid:107)C(cid:107)1 denoting
+maxs∈S (cid:107)s(cid:107)1.
+
+n(cid:80)
+
+i=1
+
+n
+
+, where Lap(λ) ∼ 1
+
+2λ e−|x|/λ.
+
+∀s ∈ S, αs ← (cid:104)s,(cid:53)L(θt; D)(cid:105) + Lap
+
+1: Choose an arbitrary θ1 from C
+2: for t = 1 to T − 1 do
+3:
+
+(cid:18)
+(cid:101)θt ← arg min
+θt+1 ← (1 − µt)θt + µt(cid:101)θt, where µt = 2
+
+s∈S
+
+αs.
+
+4:
+
+5:
+6: Output θpriv = θT .
+
+t+2.
+
+(cid:19)
+
+L1(cid:107)C(cid:107)1
+
+√
+
+8T log(1/δ)
+n
+
+Theorem 2.4 (Privacy guarantee). Algorithm 2 is (, δ)-differentially private.
+
+5
+
+Since each data item is assumed to have bounded (cid:96)∞ norm, for two neighboring databases D and
+D(cid:48) and any θ ∈ C, s ∈ S, we have that
+
+|(cid:104)s,(cid:53)L(θ; D)(cid:105) − (cid:104)s,(cid:53)L(θ; D)(cid:105)| = O(L1(cid:107)C(cid:107)1/n) .
+
+The proof of privacy then follows from a straight-forward application of the exponential mechanism
+[21] or its noisy maximum version [3, Theorem 5]) and the strong composition theorem [13]. In
+Theorem 2.5 we prove the utility guarantee for the private Frank-Wolfe algorithm for the convex
+polytope case. Deﬁne ΓL = max
+Theorem 2.5 (Utility guarantee). Let L1, S and (cid:107)C(cid:107)1 be deﬁned as in Algorithms 2 (Algorithm
+ANoise−FW(polytope)). Let ΓL be an upper bound on the curvature constant (deﬁned in Deﬁnition 2.1)
+for the loss function L(·; d) that holds for all d ∈ D. In Algorithm ANoise−FW(polytope), if we set
+T = ΓL2/3(n)2/3
+
+D∈D CL over all the possible data sets in D.
+
+(cid:32)
+
+ΓL1/3 (L1(cid:107)C(cid:107)1)2/3 log(n|S|)(cid:112)log(1/δ)
+
+(cid:33)
+
+.
+
+(L1(cid:107)C(cid:107)1)2/3 , then
+
+E(cid:2)L(θpriv; D)(cid:3) − min
+
+θ∈C L(θ; D) = O
+
+(n)2/3
+
+Here the expectation is over the randomness of the algorithm.
+
+The proof of utility uses known bounds on noisy Frank-Wolfe [17], along with error bounds for the
+exponential mechanism. The details can be found in the full version.
+General C While a variant of this mechanism can be applied to the case when C is not a polytope,
+its error would depend on the size of a cover of the boundary of C, which can be exponential in p,
+leading to an error bound with polynomial dependence on p. In the full version, we analyze another
+variant of private Frank-Wolfe that uses objective perturbation to ensure privacy. This variant is
+well-suited for a general convex set C and the following result, proven in the Appendix, bounds its
+excess risk in terms of the Gaussian Width of C. For this mechanism, we only need C to be bounded
+in (cid:96)2 diameter, but our error now depends on the (cid:96)2-Lipschitz constant of the loss functions.
+Theorem 2.6. Suppose that each loss function is L2-Lipschitz with respect to the (cid:96)2 norm, and that
+C has (cid:96)2 diameter at most (cid:107)C(cid:107)2. Let GC the Gaussian width of the convex set C ⊆ Rp, and let ΓL
+be the curvature constant (deﬁned in Deﬁnition 2.1) for the loss function (cid:96)(θ; d) for all θ ∈ C and
+d ∈ D. Then there is an (, δ)-differentially private algorithm ANoise−FW with excess empirical risk:
+
+E(cid:2)L(θpriv; D)(cid:3) − min
+
+(cid:32)
+
+θ∈C L(θ; D) = O
+
+ΓL1/3 (L2GC)2/3 log2(n/δ)
+
+(n)2/3
+
+(cid:33)
+
+.
+
+Here the expectation is over the randomness of the algorithm.
+
+2.2 Private LASSO algorithm
+We now apply the private Frank-Wolfe algorithm ANoise−FW(polytope) to the important case of the
+sparse linear regression (or LASSO) problem.
+Problem deﬁnition: Given a data set D = {(x1, y1),··· , (xn, yn)} of n-samples from the domain
+D = {(x, y) : x ∈ Rp, y ∈ [−1, 1],(cid:107)x(cid:107)∞ ≤ 1}, and the convex set C = (cid:96)p
+1. Deﬁne the mean
+squared loss,
+
+L(θ; D) =
+
+((cid:104)xi, θ(cid:105) − yi)2 .
+
+(2)
+
+(cid:88)
+
+i∈[n]
+
+1
+n
+
+The objective is to compute θpriv ∈ C to minimize L(θ; D) while preserving privacy with respect to
+any change of individual (xi, yi) pair. The non-private setting of the above problem is a variant of
+the least squares problem with (cid:96)1 regularization, which was started by the work of LASSO [27, 28]
+and intensively studied in the past years.
+Since the (cid:96)1 ball is the convex hull of 2p vertices, we can apply the private Frank-Wolfe algo-
+rithm ANoise−FW(polytope). For the above setting, it is easy to check that the (cid:96)1-Lipschitz constant is
+bounded by O(1). Further, by applying the bound on quadratic programming Remark 1, we have
+2 = O(1) since C is the unit (cid:96)1 ball, and |xij| ≤ 1. Hence Γ = O(1).
+that CL ≤ 4 maxθ∈C 1
+Now applying Theorem 2.5, we have
+
+n(cid:107)Xθ(cid:107)2
+
+6
+
+Corollary 2.7. Let D = {(x1, y1),··· , (xn, yn)} of n samples from the domain D = {(x, y) :
+(cid:107)x(cid:107)∞ ≤ 1,|y| ≤ 1}, and the convex set C equal to the (cid:96)1-ball. The output θpriv of Algorithm
+ANoise−FW(polytope) ensures the following.
+
+E[L(θpriv; D) − min
+
+θ∈C L(θ; D)] = O
+
+(cid:18) log(np/δ)
+
+(cid:19)
+
+(n)2/3
+
+.
+
+Remark 2. Compared to the previous work [20, 24], the above upper bound makes no assumption of
+restricted strong convexity or mutual incoherence, which might be too strong for realistic settings.
+Also our results signiﬁcantly improve bounds of [19], from ˜O(1/n1/3) to ˜O(1/n2/3), which con-
+sidered the case of the set C being the probability simplex and the loss being a generalized linear
+model.
+
+3 Optimality of Private LASSO
+
+In the following, we shall show that to ensure privacy, the error bound in Corollary 2.7 is nearly
+optimal in terms of the dominant factor of 1/n2/3.
+Theorem 3.1 (Optimality of private Frank-Wolfe). Let C be the (cid:96)1-ball and L be the mean squared
+loss in equation (2). For every sufﬁciently large n, for every (, δ)-differentially private algorithm
+A, with  ≤ 0.1 and δ = o(1/n2), there exists a data set D = {(x1, y1),··· , (xn, yn)} of n samples
+from the domain D = {(x, y) : (cid:107)x(cid:107)∞ ≤ 1,|y| ≤ 1} such that
+
+E[L(A(D); D) − min
+
+θ∈C L(θ; D)] =(cid:101)Ω
+
+(cid:18) 1
+
+n2/3
+
+(cid:19)
+
+.
+
+We prove the lower bound by following the ﬁngerprinting codes argument of [4] for lowerbound-
+ing the error of (, δ)-differentially private algorithms. Similar to [4] and [14], we start with the
+following lemma which is implicit in [4].The matrix X in Theorem 3.2 is the padded Tardos code
+used in [14, Section 5]. For any matrix X, denote by X(i) the matrix obtained by removing the i-th
+row of X. Call a column of a matrix a consensus column if the entries in the column are either all
+1 or all −1. The sign of a consensus column is simply the consensus value of the column. Write
+w = m/ log m and p = 1000m2. The following theorem follows immediately from the proof of
+Corollary 16 in [14].
+Theorem 3.2. [Corollary 16 from [14], restated] Let m be a sufﬁciently large positive integer. There
+exists a matrix X ∈ {−1, 1}(w+1)×p with the following property. For each i ∈ [1, w + 1], there are
+at least 0.999p consensus columns Wi in each X(i). In addition, for algorithm A on input matrix
+X(i) where i ∈ [1, w + 1], if with probability at least 2/3, A(X(i)) produces a p-dimensional sign
+4 p columns in Wi, then A is not (ε, δ) differentially private with
+vector which agrees with at least 3
+respect to single row change (to some other row in X).
+Write τ = 0.001. Let k = τ wp. We ﬁrst form an k × p matrix Y where the column vectors of
+Y are mutually orthogonal {1,−1} vectors. This is possible as k (cid:29) p. Now we construct w + 1
+databases Di for 1 ≤ i ≤ w + 1 as follows. For all the databases, they contain the common set of
+examples (zj, 0) (i.e. vector zj with label 0) for 1 ≤ j ≤ k where zj = (Yj1, . . . , Yjp) is the j-th
+row vector of Y . In addition, each Di contains w examples (xj, 1) for xj = (Xj1, . . . , Xjk) for
+j (cid:54)= i. Then L(θ; Di) is deﬁned as follows (for the ease of notation in this proof, we work with the
+un-normalized loss. This does not affect the generality of the arguments in any way.)
+(xj · θ − 1)2 + k(cid:107)θ(cid:107)2
+2 .
+
+(xj · θ − 1)2 +
+
+L(θ; Di) =
+
+(yj · θ)2 =
+
+k(cid:88)
+
+(cid:88)
+
+j=1
+
+j(cid:54)=i
+
+The last equality is due to that the columns of Y are mutually orthogonal {−1, 1} vectors. For each
+such that the sign of the coordinates of θ∗ matches the sign for the
+
+consensus columns of X(i). Plugging θ∗ in L(θ∗; ˆD) we have the following,
+
+(cid:88)
+(cid:111)p
+
+j(cid:54)=i
+
+p , 1
+
+p
+
+Di, consider θ∗ ∈ (cid:110)− 1
+L(θ∗; ˆD) ≤ w(cid:88)
+
+(2τ )2 +
+
+i=1
+
+k
+p
+
+[since the number of consensus columns is at least (1 − τ )p]
+
+= (τ + 4τ 2)w .
+
+(3)
+
+7
+
+We now prove the crucial lemma, which states that if θ is such that (cid:107)θ(cid:107)1 ≤ 1 and L(θ; Di) is small,
+then θ has to agree with the sign of most of the consensus columns of X(i).
+Lemma 3.3. Suppose that (cid:107)θ(cid:107)1 ≤ 1, and L(θ; Di) < 1.1τ w. For j ∈ Wi, denote by sj the sign of
+the consensus column j. Then we have
+|{j ∈ Wi
+
+p .
+
+: sign(θj) = sj}| ≥ 3
+4
+
+Proof. For any S ⊆ {1, . . . , p}, denote by θ|S the projection of θ to the coordinate subset S. Con-
+sider three subsets S1, S2, S3, where
+
+S1 = {j ∈ Wi
+S2 = {j ∈ Wi
+S3 = {1, . . . , p} \ Wi .
+
+: sign(θj) = sj} ,
+: sign(θj) (cid:54)= sj} ,
+
+The proof is by contradiction. Assume that |S1| < 3
+4 p.
+Further denote θi = θ|Si for i = 1, 2, 3. Now we will bound (cid:107)θ1(cid:107)1 and (cid:107)θ3(cid:107)1 using the inequality
+(cid:107)x(cid:107)2 ≥ (cid:107)x(cid:107)1/
+
+√
+
+2 ≥ w(cid:107)θ3(cid:107)2
+
+d for any d-dimensional vector.
+(cid:107)θ3(cid:107)2
+2 ≥ (cid:107)θ3(cid:107)2
+1. But k(cid:107)θ3(cid:107)2
+Hence k(cid:107)θ3(cid:107)2
+2 ≤ k(cid:107)θ(cid:107)2
+Similarly by the assumption of |S1| < 3
+4 p,
+
+1/|S3| ≥ (cid:107)θ3(cid:107)2
+2 ≤ 1.1τ w, so that (cid:107)θ3(cid:107)1 ≤ √
+2 < 1.1τ w, we have that (cid:107)θ1(cid:107)1 ≤(cid:112)1.1 ∗ 3/4 ≤ 0.91.
+
+1/|S1| ≥ 4(cid:107)θ1(cid:107)2
+
+2 ≥ (cid:107)θ1(cid:107)2
+
+(cid:107)θ1(cid:107)2
+
+1/(τ p) .
+
+1/(3p) .
+
+Again using k(cid:107)θ(cid:107)2
+Now we have (cid:104)xi, θ(cid:105) − 1 = (cid:107)θ1(cid:107)1 − (cid:107)θ2(cid:107)1 + βi − 1 where |βi| ≤ (cid:107)θ3(cid:107)1 ≤ 0.04. By (cid:107)θ1(cid:107)1 +
+(cid:107)θ2(cid:107)1 + (cid:107)θ3(cid:107)1 ≤ 1, we have
+
+1.1τ ≤ 0.04.
+
+|(cid:104)xi, θ(cid:105) − 1| ≥ 1 − (cid:107)θ1(cid:107) − |βi| ≥ 1 − 0.91 − 0.04 = 0.05 .
+
+Hence we have that L(θ; Di) ≥ (0.05)2w ≥ 1.1τ w. This leads to a contradiction. Hence we must
+have |S1| ≥ 3
+4 p.
+
+With Theorem 3.2 and Lemma 3.3, we can now prove Theorem 3.1.
+Proof. Suppose that A is private. And for the datasets we constructed above,
+
+E[L(A(Di); Di) − min
+
+L(θ; Di)] ≤ cw ,
+
+for sufﬁciently small constant c. By Markov inequality, we have with probability at least 2/3,
+L(A(Di); Di) − minθ L(θ; Di) ≤ 3cw. By (3), we have min
+L(θ; Di) ≤ (τ + 4τ 2)w. Hence if we
+choose c a constant small enough, we have with probability 2/3,
+
+θ
+
+By Lemma 3.3, (4) implies that A(Di) agrees with at least 3
+by Theorem 3.2, this violates the privacy of A. Hence we have that there exists i, such that
+
+(4)
+4 p consensus columns in X(i). However
+
+L(A(Di); Di) < (τ + 4τ 2 + 3c)w ≤ 1.1τ w .
+
+E[L(A(Di); Di) − min
+
+L(θ; Di)] > cw .
+
+θ
+
+θ
+
+Recall that w = m/ log m and n = w + wp = O(m3/ log m). Hence we have that
+
+E[L(A(Di); Di) − min
+
+θ
+
+L(θ; Di)] = Ω(n1/3/ log2/3 n) .
+
+The proof
+Ω(1/(n log n)2/3).
+
+is completed by converting the above bound to the normalized version of
+
+8
+
+References
+[1] P. L. Bartlett and S. Mendelson. Rademacher and gaussian complexities: Risk bounds and structural
+
+results. The Journal of Machine Learning Research, 3:463–482, 2003.
+
+[2] R. Bassily, A. Smith, and A. Thakurta. Private empirical risk minimization, revisited. In FOCS, 2014.
+[3] R. Bhaskar, S. Laxman, A. Smith, and A. Thakurta. Discovering frequent patterns in sensitive data. In
+
+KDD, New York, NY, USA, 2010.
+
+[4] M. Bun, J. Ullman, and S. Vadhan. Fingerprinting codes and the price of approximate differential privacy.
+
+In STOC, 2014.
+
+[5] V. Chandrasekaran, B. Recht, P. A. Parrilo, and A. S. Willsky. The convex geometry of linear inverse
+
+problems. Foundations of Computational Mathematics, 12(6):805–849, 2012.
+
+[6] K. Chaudhuri and C. Monteleoni. Privacy-preserving logistic regression. In NIPS, 2008.
+[7] K. Chaudhuri, C. Monteleoni, and A. D. Sarwate. Differentially private empirical risk minimization.
+
+JMLR, 12:1069–1109, 2011.
+
+[8] K. L. Clarkson. Coresets, sparse greedy approximation, and the Frank-Wolfe algorithm. ACM Transations
+
+on Algorithms, 2010.
+
+[9] J. C. Duchi, M. I. Jordan, and M. J. Wainwright. Local privacy and statistical minimax rates. In FOCS,
+
+2013.
+
+[10] C. Dwork, F. McSherry, K. Nissim, and A. Smith. Calibrating noise to sensitivity in private data analysis.
+
+In Theory of Cryptography Conference, pages 265–284. Springer, 2006.
+
+[11] C. Dwork, A. Nikolov, and K. Talwar. Efﬁcient algorithms for privately releasing marginals via convex
+
+relaxations. arXiv preprint arXiv:1308.1385, 2013.
+
+[12] C. Dwork and A. Roth. The Algorithmic Foundations of Differential Privacy. Foundations and Trends in
+
+Theoretical Computer Science. NOW Publishers, 2014.
+
+[13] C. Dwork, G. N. Rothblum, and S. P. Vadhan. Boosting and differential privacy. In FOCS, 2010.
+[14] C. Dwork, K. Talwar, A. Thakurta, and L. Zhang. Analyze gauss: optimal bounds for privacy-preserving
+
+principal component analysis. In STOC, 2014.
+
+[15] M. Frank and P. Wolfe. An algorithm for quadratic programming. Naval research logistics quarterly,
+
+3(1-2):95–110, 1956.
+
+[16] E. Hazan and S. Kale. Projection-free online learning. In ICML, 2012.
+[17] M. Jaggi. Revisiting {Frank-Wolfe}: Projection-free sparse convex optimization. In ICML, 2013.
+[18] P. Jain, P. Kothari, and A. Thakurta. Differentially private online learning. In COLT, pages 24.1–24.34,
+
+2012.
+
+[19] P. Jain and A. Thakurta. (near) dimension independent risk bounds for differentially private learning. In
+
+International Conference on Machine Learning (ICML), 2014.
+
+[20] D. Kifer, A. Smith, and A. Thakurta. Private convex empirical risk minimization and high-dimensional
+
+regression. In COLT, pages 25.1–25.40, 2012.
+
+[21] F. McSherry and K. Talwar. Mechanism design via differential privacy. In FOCS, pages 94–103. IEEE,
+
+2007.
+
+[22] A. Nikolov, K. Talwar, and L. Zhang. The geometry of differential privacy: The sparse and approximate
+
+cases. In STOC, 2013.
+
+[23] S. Shalev-Shwartz, N. Srebro, and T. Zhang. Trading accuracy for sparsity in optimization problems with
+
+sparsity constraints. SIAM Journal on Optimization, 2010.
+
+[24] A. Smith and A. Thakurta. Differentially private feature selection via stability arguments, and the robust-
+
+ness of the Lasso. In COLT, 2013.
+
+[25] A. Smith and A. Thakurta. Follow the perturbed leader is differentially private with optimal regret guar-
+
+antees. Manuscript in preparation, 2013.
+
+[26] A. Smith and A. Thakurta. Nearly optimal algorithms for private online learning in full-information and
+
+bandit settings. In NIPS, 2013.
+
+[27] R. Tibshirani. Regression shrinkage and selection via the lasso. Journal of the Royal Statistical Society.
+
+Series B (Methodological), 1996.
+
+[28] R. Tibshirani et al. The Lasso method for variable selection in the cox model. Statistics in medicine,
+
+16(4):385–395, 1997.
+
+[29] J. Ullman. Private multiplicative weights beyond linear queries. CoRR, abs/1407.1571, 2014.
+
+9
+
+

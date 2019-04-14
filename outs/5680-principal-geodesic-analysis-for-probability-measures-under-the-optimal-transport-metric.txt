@@ -1,0 +1,766 @@
+Principal Geodesic Analysis for Probability Measures
+
+under the Optimal Transport Metric
+
+vivien.seguy@iip.ist.i.kyoto-u.ac.jp
+
+mcuturi@i.kyoto-u.ac.jp
+
+Marco Cuturi
+
+Graduate School of Informatics
+
+Kyoto University
+
+Vivien Seguy
+
+Graduate School of Informatics
+
+Kyoto University
+
+Abstract
+
+Given a family of probability measures in P (X ), the space of probability mea-
+sures on a Hilbert space X , our goal in this paper is to highlight one ore more
+curves in P (X ) that summarize efﬁciently that family. We propose to study this
+problem under the optimal transport (Wasserstein) geometry, using curves that
+are restricted to be geodesic segments under that metric. We show that concepts
+that play a key role in Euclidean PCA, such as data centering or orthogonality of
+principal directions, ﬁnd a natural equivalent in the optimal transport geometry,
+using Wasserstein means and differential geometry. The implementation of these
+ideas is, however, computationally challenging. To achieve scalable algorithms
+that can handle thousands of measures, we propose to use a relaxed deﬁnition
+for geodesics and regularized optimal transport distances. The interest of our ap-
+proach is demonstrated on images seen either as shapes or color histograms.
+
+1
+
+Introduction
+
+Optimal transport distances (Villani, 2008), a.k.a Wasserstein or earth mover’s distances, deﬁne
+a powerful geometry to compare probability measures supported on a metric space X . The
+Wasserstein space P (X )—the space of probability measures on X endowed with the Wasserstein
+distance—is a metric space which has received ample interest from a theoretical perspective. Given
+the prominent role played by probability measures and feature histograms in machine learning, the
+properties of P (X ) can also have practical implications in data science. This was shown by Agueh
+and Carlier (2011) who described ﬁrst Wasserstein means of probability measures. Wasserstein
+means have been recently used in Bayesian inference (Srivastava et al., 2015), clustering (Cuturi
+and Doucet, 2014), graphics (Solomon et al., 2015) or brain imaging (Gramfort et al., 2015). When
+X is not just metric but also a Hilbert space, P (X ) is an inﬁnite-dimensional Riemannian manifold
+(Ambrosio et al. 2006, Chap. 8; Villani 2008, Part II). Three recent contributions by Boissard et al.
+(2015, §5.2), Bigot et al. (2015) and Wang et al. (2013) exploit directly or indirectly this structure to
+extend Principal Component Analysis (PCA) to P (X ). These important seminal papers are, how-
+ever, limited in their applicability and/or the type of curves they output. Our goal in this paper is to
+propose more general and scalable algorithms to carry out Wasserstein principal geodesic analysis
+on probability measures, and not simply dimensionality reduction as explained below.
+Principal Geodesics in P (X ) vs. Dimensionality Reduction on P (X ) We provide in Fig. 1 a
+simple example that illustrates the motivation of this paper, and which also shows how our approach
+differentiates itself from existing dimensionality reduction algorithms (linear and non-linear) that
+draw inspiration from PCA. As shown in Fig. 1, linear PCA cannot produce components that re-
+main in P (X ). Even more advanced tools, such as those proposed by Hastie and Stuetzle (1989),
+fall slightly short of that goal. On the other hand, Wasserstein geodesic analysis yields geodesic
+components in P (X ) that are easy to interpret and which can also be used to reduce dimensionality.
+
+1
+
+P (X )
+
+Wasserstein Principal Geodesics
+Euclidean Principal Components
+Principal Curve
+
+Figure 1: (top-left) Dataset: 60 × 60 images of a single Chinese character randomly translated,
+scaled and slightly rotated (36 images displayed out of 300 used). Each image is handled as a
+normalized histogram of 3, 600 non-negative intensities. (middle-left) Dataset schematically drawn
+on P (X ). The Wasserstein principal geodesics of this dataset are depicted in red, its Euclidean
+components in blue, and its principal curve (Verbeek et al., 2002) in yellow. (right) Actual curves
+(blue colors depict negative intensities, green intensities ≥ 1). Neither the Euclidean components
+nor the principal curve belong to P (X ), nor can they be interpreted as meaningful axis of variation.
+
+Foundations of PCA and Riemannian Extensions Carrying out PCA on a family (x1, . . . , xn)
+of points taken in a space X can be described in abstract terms as: (i) deﬁne a mean element ¯x
+for that dataset; (ii) deﬁne a family of components in X, typically geodesic curves, that contain ¯x;
+(iii) ﬁt a component by making it follow the xi’s as closely as possible, in the sense that the sum
+of the distances of each point xi to that component is minimized; (iv) ﬁt additional components
+by iterating step (iii) several times, with the added constraint that each new component is different
+(orthogonal) enough to the previous components. When X is Euclidean and the xi’s are vectors in
+Rd, the (n + 1)-th component vn+1 can be computed iteratively by solving:
+
+N(cid:88)
+
+i=1
+
+vn+1 ∈ argmin
+
+v∈V ⊥
+
+n ,||v||2=1
+
+t∈R (cid:107)xi − (¯x + tv)(cid:107)2
+
+min
+
+2, where V0
+
+def.= ∅, and Vn
+
+def.= span{v1,··· , vn}. (1)
+
+Since PCA is known to boil down to a simple eigen-decomposition when X is Euclidean or Hilber-
+tian (Sch¨olkopf et al., 1997), Eq. (1) looks artiﬁcially complicated. This formulation is, however,
+extremely useful to generalize PCA to Riemannian manifolds (Fletcher et al., 2004). This gen-
+eralization proceeds ﬁrst by replacing vector means, lines and orthogonality conditions using re-
+spectively Fr´echet means (1948), geodesics, and orthogonality in tangent spaces. Riemannian PCA
+builds then upon the knowledge of the exponential map at each point x of the manifold X. Each ex-
+ponential map expx is locally bijective between the tangent space Tx of x and X. After computing
+the Fr´echet mean ¯x of the dataset, the logarithmic map log¯x at ¯x (the inverse of exp¯x) is used to map
+all data points xi onto T¯x. Because T¯x is a Euclidean space by deﬁnition of Riemannian manifolds,
+the dataset (log¯x xi)i can be studied using Euclidean PCA. Principal geodesics in X can then be
+recovered by applying the exponential map to a principal component v(cid:63), {exp¯x(tv(cid:63)),|t| < ε}.
+From Riemannian PCA to Wasserstein PCA: Related Work As remarked by Bigot et al.
+(2015), Fletcher et al.’s approach cannot be used as it is to deﬁne Wasserstein geodesic PCA, be-
+cause P (X ) is inﬁnite dimensional and because there are no known ways to deﬁne exponential
+maps which are locally bijective between Wasserstein tangent spaces and the manifold of probabil-
+ity measures. To circumvent this problem, Boissard et al. (2015), Bigot et al. (2015) have proposed
+to formulate the geodesic PCA problem directly as an optimization problem over curves in P (X ).
+
+2
+
+Boissard et al. and Bigot et al. study the Wasserstein PCA problem in restricted scenarios: Bigot
+et al. focus their attention on measures supported on X = R, which considerably simpliﬁes their
+analysis since it is known in that case that the Wasserstein space P (R) can be embedded isometri-
+cally in L1(R); Boissard et al. assume that each input measure has been generated from a single
+template density (the mean measure) which has been transformed according to one “admissible de-
+formation” taken in a parameterized family of deformation maps. Their approach to Wasserstein
+PCA boils down to a functional PCA on such maps. Wang et al. proposed a more general approach:
+given a family of input empirical measures (µ1, . . . , µN ), they propose to compute ﬁrst a “template
+i µi. They consider next all optimal transport plans πi
+between that template ˜µ and each of the measures µi, and propose to compute the barycentric pro-
+jection (see Eq. 8) of each optimal transport plan πi to recover Monge maps Ti, on which standard
+PCA can be used. This approach is computationally attractive since it requires the computation of
+only one optimal transport per input measure. Its weakness lies, however, in the fact that the curves
+in P (X ) obtained by displacing ˜µ along each of these PCA directions are not geodesics in general.
+
+measure” ˜µ using k-means clustering on(cid:80)
+
+Contributions and Outline We propose a new algorithm to compute Wasserstein Principal
+Geodesics (WPG) in P (X ) for arbitrary Hilbert spaces X . We use several approximations—both
+of the optimal transport metric and of its geodesics—to obtain tractable algorithms that can scale
+to thousands of measures. We provide ﬁrst in §2 a review of the key concepts used in this paper,
+namely Wasserstein distances and means, geodesics and tangent spaces in the Wasserstein space.
+We propose in §3 to parameterize a Wasserstein principal component (PC) using two velocity ﬁelds
+deﬁned on the support of the Wasserstein mean of all measures, and formulate the WPG problem
+as that of optimizing these velocity ﬁelds so that the average distance of all measures to that PC
+is minimal. This problem is non-convex and non-smooth. We propose to optimize smooth upper-
+bounds of that objective using entropy regularized optimal transport in §4. The practical interest of
+our approach is demonstrated in §5 on toy samples, datasets of shapes and histograms of colors.
+Notations We write (cid:104)A, B (cid:105) for the Frobenius dot-product of matrices A and B. D(u) is the
+diagonal matrix of vector u. For a mapping f : Y → Y, we say that f acts on a measure µ ∈ P (Y)
+through the pushforward operator # to deﬁne a new measure f #µ ∈ P (Y). This measure is
+characterized by the identity (f #µ)(B) = µ(f−1(B)) for any Borel set B ⊂ Y. We write p1 and
+p2 for the canonical projection operators X 2 → X , deﬁned as p1(x1, x2) = x1 and p2(x1, x2) = x2.
+
+2 Background on Optimal Transport
+
+Wasserstein Distances We start this section with the main mathematical object of this paper:
+Deﬁnition 1. (Villani, 2008, Def. 6.1) Let P (X ) the space of probability measures on a Hilbert
+space X . Let Π(ν, η) be the set of probability measures on X 2 with marginals ν and η, i.e. p1#π =
+ν and p2#π = η. The squared 2-Wasserstein distance between ν and η in P (X ) is deﬁned as:
+
+W 2
+
+2 (ν, η) =
+
+inf
+
+π∈Π(ν,η)
+
+X 2
+
+(cid:107)x − y(cid:107)2X dπ(x, y).
+
+(2)
+
+Wasserstein Barycenters Given a family of N probability measures (µ1,··· , µN ) in P (X ) and
+weights λ ∈ RN
++ , Agueh and Carlier (2011) deﬁne ¯µ, the Wasserstein barycenter of these measures:
+
+(cid:90)
+
+N(cid:88)
+
+i=1
+
+¯µ ∈ argmin
+ν∈P (X )
+
+λiW 2
+
+2 (µi, ν).
+
+Our paper relies on several algorithms which have been recently proposed (Benamou et al., 2015;
+Bonneel et al., 2015; Carlier et al., 2015; Cuturi and Doucet, 2014) to compute such barycenters.
+
+Wasserstein Geodesics Given two measures ν and η, let Π(cid:63)(ν, η) be the set of optimal couplings
+for Eq. (2). Informally speaking, it is well known that if either ν or η are absolutely continuous
+measures, then any optimal coupling π(cid:63) ∈ Π(cid:63)(ν, η) is degenerated in the sense that, assuming for
+instance that ν is absolutely continuous, for all x in the support of ν only one point y ∈ X is
+such that dπ(cid:63)(x, y) > 0. In that case, the optimal transport is said to have no mass splitting, and
+
+3
+
+there exists an optimal mapping T : X → X such that π(cid:63) can be written, using a pushforward, as
+π(cid:63) = (id× T )#ν. When there is no mass splitting to transport ν to η, McCann’s interpolant (1997):
+
+gt = ((1 − t)id + tT )#ν, t ∈ [0, 1],
+
+(3)
+deﬁnes a geodesic curve in the Wasserstein space, i.e. (gt)t is locally the shortest path between
+any two measures located on the geodesic, with respect to W2. In the more general case, where no
+optimal map T exists and mass splitting occurs (for some locations x one may have dπ(cid:63)(x, y) > 0
+for several y), then a geodesic can still be deﬁned, but it relies on the optimal plan π(cid:63) instead:
+gt = ((1− t)p1 + tp2)#π(cid:63), t ∈ [0, 1], (Ambrosio et al., 2006, §7.2). Both cases are shown in Fig. 2.
+
+Figure 2: Both plots display geodesic curves between two empirical measures ν and η on R2. An
+optimal map exists in the left plot (no mass splitting occurs), whereas some of the mass of ν needs
+to be split to be transported onto η on the right plot.
+
+Tangent Space and Tangent Vectors We brieﬂy describe in this section the tangent spaces of
+P (X ), and refer to (Ambrosio et al., 2006, Chap. 8) for more details. Let µ : I ⊂ R → P (X )
+be a curve in P (X ). For a given time t, the tangent space of P (X ) at µt is a subset of L2(µt,X ),
+the space of square-integrable velocity ﬁelds supported on Supp(µt). At any t, there exists tangent
+vectors vt in L2(µt,X ) such that limh→0 W2(µt+h, (id + hvt)#µt)/|h| = 0. Given a geodesic
+curve in P (X ) parameterized as Eq. (3), its corresponding tangent vector at time zero is v = T − id.
+
+3 Wasserstein Principal Geodesics
+
+Geodesic Parameterization The goal of principal geodesic analysis is to deﬁne geodesic curves
+in P (X ) that go through the mean ¯µ and which pass close enough to all target measures µi. To that
+end, geodesic curves can be parameterized with two end points ν and η. However, to avoid dealing
+with the constraint that a principal geodesic needs to go through ¯µ, one can start instead from ¯µ, and
+consider a velocity ﬁeld v ∈ L2(¯µ,X ) which displaces all of the mass of ¯µ in both directions:
+
+gt(v) def.= (id + tv) #¯µ,
+
+t ∈ [−1, 1].
+
+(4)
+
+Lemma 7.2.1 of Ambrosio et al. (2006) implies that any geodesic going through ¯µ can be written
+as Eq. (4). Hence, we do not lose any generality using this parameterization. However, given an
+arbitrary vector ﬁeld v, the curve (gt(v))t is not necessarily a geodesic. Indeed, the maps id ± v are
+not necessarily in the set C¯µ
+def.= {r ∈ L2(¯µ,X )|(id× r)#¯µ ∈ Π(cid:63)(¯µ, r#¯µ)} of maps that are optimal
+when moving mass away from ¯µ. Ensuring thus, at each step of our algorithm, that v is still such
+that (gt(v))t is a geodesic curve is particularly challenging. To relax this strong assumption, we
+propose to use a generalized formulation of geodesics, which builds upon not one but two velocity
+ﬁelds, as introduced by Ambrosio et al. (2006, §9.2):
+Deﬁnition 2. (adapted from (Ambrosio et al., 2006, §9.2)) Let σ, ν, η ∈ P (X ), and assume there
+is an optimal mapping T (σ,ν) from σ to ν and an optimal mapping T (σ,η) from σ to η. A generalized
+geodesic, illustrated in Fig. 3 between ν and η with base σ is deﬁned by,
+t ∈ [0, 1].
+
+(1 − t)T (σ,ν) + tT (σ,η)(cid:17)
+
+#σ,
+
+(cid:16)
+
+gt =
+
+Choosing ¯µ as the base measure in Deﬁnition 2, and two ﬁelds v1, v2 such that id − v1, id + v2 are
+optimal mappings (in C¯µ), we can deﬁne the following generalized geodesic gt(v1, v2):
+
+gt(v1, v2) def.= (id − v1 + t(v1 + v2)) #¯µ, for t ∈ [0, 1].
+
+(5)
+
+4
+
+1.31.41.51.61.71.800.10.20.30.4  ηνgeodesicg1/3g2/30.811.21.41.60.50.550.60.650.7  ηνgeodesicg1/3g2/3Generalized geodesics become true geodesics when v1 and v2 are positively proportional. We can
+thus consider a regularizer that controls the deviation from that property by deﬁning Ω(v1, v2) =
+((cid:104)v1, v2 (cid:105)L2(¯µ,X ) − (cid:107)v1(cid:107)L2(¯µ,X )(cid:107)v2(cid:107)L2(¯µ,X ))2, which is minimal when v1 and v2 are indeed posi-
+tively proportional. We can now formulate the WPG problem as computing, for n ≥ 0, the (n + 1)th
+principal (generalized) geodesic component of a family of measures (µi)i by solving, with λ > 0:
+
+(cid:40)
+
+min
+
+λΩ(v1, v2) +
+
+v1,v2∈L2(¯µ,X )
+
+min
+t∈[0,1]
+
+W 2
+
+2 (gt(v1, v2), µi), s.t.
+
+id − v1, id + v2 ∈ C¯µ,
+v1 +v2∈span({v(i)
+
+1 + v(i)
+
+2 }i≤n)⊥.
+
+(6)
+
+N(cid:88)
+
+i=1
+
+This problem is not convex in v1, v2. We pro-
+pose to ﬁnd an approximation of that minimum
+by a projected gradient descent, with a projec-
+tion that is to be understood in terms of an al-
+ternative metric on the space of vector ﬁelds
+L2(¯µ,X ). To preserve the optimality of the
+mappings id − v1 and id + v2 between itera-
+tions, we introduce in the next paragraph a suit-
+able projection operator on L2(¯µ,X ).
+Remark 1. A trivial way to ensure that (gt(v))t
+is geodesic is to impose that the vector ﬁeld v is
+a translation, namely that v is uniformly equal
+to a vector τ on all of Supp(¯µ). One can show
+in that case that the WPG problem described
+in Eq. (6) outputs an optimal vector τ which is
+the Euclidean principal component of the fam-
+ily formed by the means of each measure µi.
+
+Figure 3: Generalized geodesic interpolation be-
+tween two empirical measures ν and η using the
+base measure σ, all deﬁned on X = R2.
+
+Projection on the Optimal Mapping Set We use a projected gradient descent method to solve
+Eq. (6) approximately. We will compute the gradient of a local upper-bound of the objective of
+Eq. (6) and update v1 and v2 accordingly. We then need to ensure that v1 and v2 are such that id− v1
+and id + v2 belong to the set of optimal mappings C¯µ. To do so, we would ideally want to compute
+the projection r2 of id + v2 in C¯µ
+
+(cid:107)(id + v2) − r(cid:107)2
+
+r2 = argmin
+r∈C ¯µ
+
+(7)
+to update v2 ← r2 − id. Westdickenberg (2010) has shown that the set of optimal mappings C¯µ is a
+convex closed cone in L2(¯µ,X ), leading to the existence and the unicity of the solution of Eq. (7).
+However, there is to our knowledge no known method to compute the projection r2 of id + v2.
+There is nevertheless a well known and efﬁcient approach to ﬁnd a mapping r2 in C¯µ which is close
+to id + v2. That approach, known as the the barycentric projection, requires to compute ﬁrst an
+optimal coupling π(cid:63) between ¯µ and (id + v2)#¯µ, to deﬁne then a (conditional expectation) map
+
+L2(¯µ,X ),
+
+Tπ(cid:63) (x) def.=
+
+ydπ(cid:63)(y|x).
+
+(8)
+
+(cid:90)
+
+X
+
+Ambrosio et al. (2006, Theorem 12.4.4) or Reich (2013, Lemma 3.1) have shown that Tπ(cid:63) is indeed
+an optimal mapping between ¯µ and Tπ(cid:63) #¯µ. We can thus set the velocity ﬁeld as v2 ← Tπ(cid:63) − id to
+carry out an approximate projection. We show in the supplementary material that this operator can
+be in fact interpreted as a projection under a pseudo-metric GW¯µ on L2(¯µ,X ).
+
+4 Computing Principal Generalized Geodesics in Practice
+We show in this section that when X = Rd, the steps outlined above can be implemented efﬁciently.
+Input Measures and Their Barycenter Each input measure in the family (µ1,··· , µN ) is a ﬁnite
+weighted sum of Diracs, described by ni points contained in a matrix Xi of size d × ni, and a (non-
+negative) weight vector ai of dimension ni summing to 1. The Wasserstein mean of these measures
+k=1 bkδyk, where the nonnegative vector b = (b1,··· , bp) sums to one,
+and Y = [y1,··· , yp] ∈ Rd×p is the matrix containing locations of ¯µ.
+
+is given and equal to ¯µ =(cid:80)p
+
+5
+
+0.20.40.60.811.21.41.600.20.40.60.811.21.4σνηgσ → νgσ → ηgg1/3g2/3Generalized Geodesic Two velocity vectors for each of the p points in ¯µ are needed to pa-
+rameterize a generalized geodesic. These velocity ﬁelds will be represented by two matrices
+p] in Rd×p. Assuming that these velocity ﬁelds yield optimal
+V1 = [v1
+mappings, the points at time t of that generalized geodesic are the measures parameterized by t,
+
+p] and V2 = [v2
+
+1,··· , v1
+
+1,··· , v2
+
+gt(V1, V2) =
+
+, with locations Zt = [zt
+
+1, . . . , zt
+
+p] def.= Y − V1 + t(V1 + V2).
+
+bkδzt
+
+k
+
+p(cid:88)
+
+k=1
+
+The squared 2-Wasserstein distance between datum µi and a point gt(V1, V2) on the geodesic is:
+
+(cid:104)P, MZtXi (cid:105),
+(9)
+P∈U (b,ai)
+where U (b, ai) is the transportation polytope {P ∈ Rp×ni
+, P 1ni = b, P T 1p = ai}, and MZtXi
+stands for the p × ni matrix of squared-Euclidean distances between the p and ni column vectors of
+Zt and Xi respectively. Writing zt = D(Z T
+
+2 (gt(V1, V2), µi) = min
+
+i Xi), we have that
+
+W 2
+
++
+
+which, by taking into account the marginal conditions on P ∈ U (b, ai), leads to,
+
+MZtXi = zt1T
+ni
+(cid:104)P, MZtXi (cid:105) = bT zt + aT
+
+t Zt) and xi = D(X T
++ 1pxT
+
+i − 2Z T
+i xi − 2(cid:104)P, Z T
+
+t Xi ∈ Rp×ni ,
+t Xi (cid:105).
+
+(10)
+1. Majorization of the Distance of each µi to the Principal Geodesic Using Eq. (10), the dis-
+tance between each µi and the PC (gt(V1, V2))t can be cast as a function fi of (V1, V2):
+−2(cid:104)P, (Y − V1 + t(V1 + V2))T Xi (cid:105)
+
+bT zt + aT
+
+(cid:18)
+
+(cid:19)
+
+i xi + min
+
+(11)
+
+.
+
+fi(V1, V2) def.= min
+t∈[0,1]
+
+P∈U (b,ai)
+
+where we have replaced Zt above by its explicit form in t to highlight that the objective above
+is quadratic convex plus piecewise linear concave as a function of t, and thus neither convex nor
+concave. Assume that we are given P (cid:93) and t(cid:93) that are approximate arg-minima for fi(V1, V2). For
+any A, B in Rd×p, we thus have that each distance fi(V1, V2) appearing in Eq. (6), is such that
+
+fi(A, B) (cid:54) mV1V2
+
+(A, B) def.= (cid:104)P (cid:93), MZt(cid:93) Xi (cid:105).
+
+i
+
+(12)
+We can thus use a majorization-minimization procedure (Hunter and Lange, 2000) to minimize the
+sum of terms fi by iteratively creating majorization functions mV1V2
+at each iterate (V1, V2). All
+functions mV1V2
+are quadratic convex. Given that we need to ensure that these velocity ﬁelds yield
+optimal mappings, and that they may also need to satisfy orthogonality constraints with respect to
+lower-order principal components, we use gradient steps to update V1, V2, which can be recovered
+using (Cuturi and Doucet, 2014, §4.3) and the chain rule as:
+= 2(t(cid:93) − 1)(Zt(cid:93) − XiP (cid:93)T D(b−1)), ∇2mV1V2
+
+= 2t(cid:93)(Zt(cid:93) − XiP (cid:93)T D(b−1)).
+
+∇1mV1V2
+
+(13)
+
+i
+
+i
+
+i
+
+i
+
+i
+
+2. Efﬁcient Approximation of P (cid:93) and t(cid:93) As discussed above, gradients for majorization func-
+tions mV1V2
+can be obtained using approximate minima P (cid:93) and t(cid:93) for each function fi. Because the
+objective of Eq. (11) is not convex w.r.t. t, we propose to do an exhaustive 1-d grid search with K
+values in [0, 1]. This approach would still require, in theory, to solve K optimal transport problems
+to solve Eq. (11) for each of the N input measures. To carry out this step efﬁciently, we propose
+to use entropy regularized transport (Cuturi, 2013), which allows for much faster computations and
+efﬁcient parallelizations to recover approximately optimal transports P (cid:93).
+
+3. Projected Gradient Update Velocity ﬁelds are updated with a gradient stepsize β > 0,
+
+∇1mV1V2
+
+V1 ← V1 − β
+
++ λ∇2Ω
+i=1
+,··· , V (n)
+)⊥
+followed by a projection step to enforce that V1 and V2 lie in span(V (1)
+in the L2(¯µ,X ) sense when computing the (n + 1)th PC. We ﬁnally apply the barycentric projection
+operator deﬁned in the end of §3. We ﬁrst need to compute two optimal transport plans,
+
+, V2 ← V2 − β
+
+∇2mV1V2
+
++ λ∇1Ω
+
+1 + V (n)
+
+1 + V (1)
+
+i=1
+
+2
+
+2
+
+,
+
+i
+
+i
+
+to form the barycentric projections, which then yield updated velocity vectors:
+
+(cid:104)P, MY (Y −V1) (cid:105), P (cid:63)
+
+1 ∈ argmin
+P (cid:63)
+P∈U (b,b)
+
+V1 ← −(cid:0)(Y − V1)P (cid:63)T
+
+1 D(b−1) − Y(cid:1) ,
+
+2 ∈ argmin
+P∈U (b,b)
+
+(cid:104)P, MY (Y +V2) (cid:105),
+
+V2 ← (Y + V2)P (cid:63)T
+
+2 D(b−1) − Y.
+
+We repeat steps 1,2,3 until convergence. Pseudo-code is given in the supplementary material.
+
+(14)
+
+(15)
+
+(cid:33)
+
+6
+
+(cid:32) N(cid:88)
+
+(cid:32) N(cid:88)
+
+(cid:33)
+
+5 Experiments
+
+Figure 4: Wasserstein mean ¯µ and ﬁrst PC computed on a dataset of four (left) and three (right)
+empirical measures. The second PC is also displayed in the right ﬁgure.
+
+Toy samples: We ﬁrst run our algorithm on two simple synthetic examples. We consider re-
+spectively 4 and 3 empirical measures supported on a small number of locations in X = R2, so
+that we can compute their exact Wasserstein means, using the multi-marginal linear programming
+formulation given in (Agueh and Carlier, 2011, §4). These measures and their mean (red squares)
+are shown in Fig. 4. The ﬁrst principal component on the left example is able to capture both the
+variability of average measure locations, from left to right, and also the variability in the spread
+of the measure locations. On the right example, the ﬁrst principal component captures the overall
+elliptic shape of the supports of all considered measures. The second principal component reﬂects
+the variability in the parameters of each ellipse on which measures are located. The variability in
+the weights of each location is also captured through the Wasserstein mean, since each single line
+of a generalized geodesic has a corresponding location and weight in the Wasserstein mean.
+
+MNIST: For each of the digits ranging from 0 to 9, we sample 1,000 images in the MNIST
+database representing that digit. Each image, originally a 28x28 grayscale image, is converted into a
+probability distribution on that grid by normalizing each intensity by the total intensity in the image.
+We compute the Wasserstein mean for each digit using the approach of Benamou et al. (2015). We
+then follow our approach to compute the ﬁrst three principal geodesics for each digit. Geodesics
+for four of these digits are displayed in Fig. 5 by showing intermediary (rasterized) measures on the
+curves. While some deformations in these curves can be attributed to relatively simple rotations
+around the digit center, more interesting deformations appear in some of the curves, such as the the
+loop on the bottom left of digit 2. Our results are easy to interpret, unlike those obtained with Wang
+et al.’s approach (2013) on these datasets, see supplementary material. Fig. 6 displays the ﬁrst PC
+obtained on a subset of MNIST composed of 2,000 images of 2 and 4 in equal proportions.
+
+P C1
+
+P C2 P C3
+
+t = 0
+
+t = 1
+
+Figure 5: 1000 images for each of the digits 1,2,3,4 were sampled from the MNIST database. We
+display above the ﬁrst three PCs sampled at times tk = k/4, k = 0, . . . , 4 for each of these digits.
+
+Color histograms: We consider a subset of the Caltech-256 Dataset composed of three image
+categories: waterfalls, tomatoes and tennis balls, resulting in a set of 295 color images. The pixels
+
+7
+
+-10123-1-0.500.5¯µµ1µ2µ3µ4pc1-6-4-20246-3-2-10123¯µµ1µ2µ3pc1pc2Figure 6: First PC on a subset of MNIST composed of one thousand 2s and one thousand 4s.
+
+contained in each image can be seen as a point-cloud in the RGB color space [0, 1]3. We use k-means
+quantization to reduce the size of these uniform point-clouds into a set of k = 128 weighted points,
+using cluster assignments to deﬁne the weights of each of the k cluster centroids. Each image can be
+thus regarded as a discrete probability measure of 128 atoms in the tridimensional RGB space. We
+then compute the Wasserstein barycenter of these measures supported on p = 256 locations using
+(Cuturi and Doucet, 2014, Alg.2). Principal components are then computed as described in §4. The
+computation for a single PC is performed within 15 minutes on an iMac (3.4GHz Intel Core i7).
+Fig. 7 displays color palettes sampled along each of the ﬁrst three PCs. The ﬁrst PC suggests that
+the main source of color variability in the dataset is the illumination, each pixel going from dark to
+light. Second and third PCs display the variation of colors induced by the typical images’ dominant
+colors (blue, red, yellow). Fig. 8 displays the second PC, along with three images projected on that
+curve. The projection of a given image on a PC is obtained by ﬁnding ﬁrst the optimal time t(cid:63) such
+that the distance of that image to the PC at t(cid:63) is minimum, and then by computing an optimal color
+transfer (Piti´e et al., 2007) between the original image and the histogram at time t(cid:63).
+
+Figure 7: Each row represents a PC displayed at regular time intervals from t = 0 (left) to t = 1
+(right), from the ﬁrst PC (top) to the third PC (bottom).
+
+Figure 8: Color palettes from the second PC (t = 0 on the left, t = 1 on the right) displayed at times
+3 , 1. Images displayed in the top row are original; their projection on the PC is displayed
+t = 0, 1
+below, using a color transfer with the palette in the PC to which they are the closest.
+
+3 , 2
+
+Conclusion We have proposed an approximate projected gradient descent method to compute gener-
+alized geodesic principal components for probability measures. Our experiments suggest that these
+principal geodesics may be useful to analyze shapes and distributions, and that they do not require
+any parameterization of shapes or deformations to be used in practice.
+
+Aknowledgements MC acknowledges the support of JSPS young researcher A grant 26700002.
+
+8
+
+References
+Martial Agueh and Guillaume Carlier. Barycenters in the Wasserstein space. SIAM Journal on Mathematical
+
+Analysis, 43(2):904–924, 2011.
+
+Luigi Ambrosio, Nicola Gigli, and Giuseppe Savar´e. Gradient ﬂows: in metric spaces and in the space of
+
+probability measures. Springer, 2006.
+
+Jean-David Benamou, Guillaume Carlier, Marco Cuturi, Luca Nenna, and Gabriel Peyr´e. Iterative Bregman
+projections for regularized transportation problems. SIAM Journal on Scientiﬁc Computing, 37(2):A1111–
+A1138, 2015.
+
+J´er´emie Bigot, Ra´ul Gouet, Thierry Klein, and Alfredo L´opez. Geodesic PCA in the Wasserstein space by
+
+convex PCA. Annales de l’Institut Henri Poincar´e B: Probability and Statistics, 2015.
+
+Emmanuel Boissard, Thibaut Le Gouic, Jean-Michel Loubes, et al. Distributions template estimate with
+
+Wasserstein metrics. Bernoulli, 21(2):740–759, 2015.
+
+Nicolas Bonneel, Julien Rabin, Gabriel Peyr´e, and Hanspeter Pﬁster. Sliced and radon Wasserstein barycenters
+
+of measures. Journal of Mathematical Imaging and Vision, 51(1):22–45, 2015.
+
+Guillaume Carlier, Adam Oberman, and Edouard Oudet. Numerical methods for matching for teams and
+
+Wasserstein barycenters. ESAIM: Mathematical Modelling and Numerical Analysis, 2015. to appear.
+
+Marco Cuturi. Sinkhorn distances: Lightspeed computation of optimal transport.
+
+Information Processing Systems, pages 2292–2300, 2013.
+
+In Advances in Neural
+
+Marco Cuturi and Arnaud Doucet. Fast computation of Wasserstein barycenters. In Proceedings of the 31st
+
+International Conference on Machine Learning (ICML-14), pages 685–693, 2014.
+
+P. Thomas Fletcher, Conglin Lu, Stephen M. Pizer, and Sarang Joshi. Principal geodesic analysis for the study
+
+of nonlinear statistics of shape. Medical Imaging, IEEE Transactions on, 23(8):995–1005, 2004.
+
+Maurice Fr´echet. Les ´el´ements al´eatoires de nature quelconque dans un espace distanci´e. In Annales de l’institut
+
+Henri Poincar´e, volume 10, pages 215–310. Presses universitaires de France, 1948.
+
+Alexandre Gramfort, Gabriel Peyr´e, and Marco Cuturi. Fast optimal transport averaging of neuroimaging data.
+
+In Information Processing in Medical Imaging (IPMI). Springer, 2015.
+
+Trevor Hastie and Werner Stuetzle. Principal curves. Journal of the American Statistical Association, 84(406):
+
+502–516, 1989.
+
+David R Hunter and Kenneth Lange. Quantile regression via an MM algorithm. Journal of Computational and
+
+Graphical Statistics, 9(1):60–77, 2000.
+
+Robert J McCann. A convexity principle for interacting gases. Advances in mathematics, 128(1):153–179,
+
+1997.
+
+Franc¸ois Piti´e, Anil C Kokaram, and Rozenn Dahyot. Automated colour grading using colour distribution
+
+transfer. Computer Vision and Image Understanding, 107(1):123–137, 2007.
+
+Sebastian Reich. A nonparametric ensemble transform method for bayesian inference. SIAM Journal on
+
+Scientiﬁc Computing, 35(4):A2013–A2024, 2013.
+
+Bernhard Sch¨olkopf, Alexander Smola, and Klaus-Robert M¨uller. Kernel principal component analysis. In
+
+Artiﬁcial Neural Networks, ICANN’97, pages 583–588. Springer, 1997.
+
+Justin Solomon, Fernando de Goes, Gabriel Peyr´e, Marco Cuturi, Adrian Butscher, Andy Nguyen, Tao Du,
+and Leonidas Guibas. Convolutional Wasserstein distances: Efﬁcient optimal transportation on geometric
+domains. ACM Transactions on Graphics (Proc. SIGGRAPH 2015), 34(4), 2015.
+
+Sanvesh Srivastava, Volkan Cevher, Quoc Tran-Dinh, and David B Dunson. Wasp: Scalable bayes via barycen-
+ters of subset posteriors. In Proceedings of the Eighteenth International Conference on Artiﬁcial Intelligence
+and Statistics, pages 912–920, 2015.
+
+Jakob J Verbeek, Nikos Vlassis, and B Kr¨ose. A k-segments algorithm for ﬁnding principal curves. Pattern
+
+Recognition Letters, 23(8):1009–1017, 2002.
+
+C´edric Villani. Optimal transport: old and new, volume 338. Springer, 2008.
+Wei Wang, Dejan Slepˇcev, Saurav Basu, John A Ozolek, and Gustavo K Rohde. A linear optimal transportation
+framework for quantifying and visualizing variations in sets of images. International journal of computer
+vision, 101(2):254–269, 2013.
+
+Michael Westdickenberg. Projections onto the cone of optimal transport maps and compressible ﬂuid ﬂows.
+
+Journal of Hyperbolic Differential Equations, 7(04):605–649, 2010.
+
+9
+
+

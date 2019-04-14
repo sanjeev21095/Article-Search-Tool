@@ -1,0 +1,1120 @@
+Explore no more: Improved high-probability regret
+
+bounds for non-stochastic bandits
+
+Gergely Neu∗
+SequeL team
+
+INRIA Lille – Nord Europe
+
+gergely.neu@gmail.com
+
+Abstract
+
+√
+
+This work addresses the problem of regret minimization in non-stochastic multi-
+armed bandit problems, focusing on performance guarantees that hold with high
+probability. Such results are rather scarce in the literature since proving them re-
+quires a large deal of technical effort and signiﬁcant modiﬁcations to the standard,
+more intuitive algorithms that come only with guarantees that hold on expectation.
+One of these modiﬁcations is forcing the learner to sample arms from the uniform
+distribution at least Ω(
+T ) times over T rounds, which can adversely affect per-
+formance if many of the arms are suboptimal. While it is widely conjectured that
+this property is essential for proving high-probability regret bounds, we show in
+this paper that it is possible to achieve such strong results without this undesirable
+exploration component. Our result relies on a simple and intuitive loss-estimation
+strategy called Implicit eXploration (IX) that allows a remarkably clean analy-
+sis. To demonstrate the ﬂexibility of our technique, we derive several improved
+high-probability bounds for various extensions of the standard multi-armed bandit
+framework. Finally, we conduct a simple experiment that illustrates the robustness
+of our implicit exploration technique.
+
+1
+
+Introduction
+
+Consider the problem of regret minimization in non-stochastic multi-armed bandits, as deﬁned in
+the classic paper of Auer, Cesa-Bianchi, Freund, and Schapire [5]. This sequential decision-making
+problem can be formalized as a repeated game between a learner and an environment (sometimes
+called the adversary).
+In each round t = 1, 2, . . . , T , the two players interact as follows: The
+learner picks an arm (also called an action) It ∈ [K] = {1, 2, . . . , K} and the environment selects
+a loss function (cid:96)t : [K] → [0, 1], where the loss associated with arm i ∈ [K] is denoted as (cid:96)t,i.
+Subsequently, the learner incurs and observes the loss (cid:96)t,It. Based solely on these observations, the
+goal of the learner is to choose its actions so as to accumulate as little loss as possible during the
+course of the game. As traditional in the online learning literature [10], we measure the performance
+of the learner in terms of the regret deﬁned as
+
+T(cid:88)
+
+t=1
+
+RT =
+
+T(cid:88)
+
+t=1
+
+(cid:96)t,It − min
+i∈[K]
+
+(cid:96)t,i.
+
+We say that the environment is oblivious if it selects the sequence of loss vectors irrespective of
+the past actions taken by the learner, and adaptive (or non-oblivious) if it is allowed to choose (cid:96)t
+as a function of the past actions It−1, . . . , I1. An equivalent formulation of the multi-armed bandit
+game uses the concept of rewards (also called gains or payoffs) instead of losses: in this version,
+∗The author is currently with the Department of Information and Communication Technologies, Pompeu
+
+Fabra University, Barcelona, Spain.
+
+1
+
+the adversary chooses the sequence of reward functions (rt) with rt,i denoting the reward given
+to the learner for choosing action i in round t. In this game, the learner aims at maximizing its
+total rewards. We will refer to the above two formulations as the loss game and the reward game,
+respectively.
+Our goal in this paper is to construct algorithms for the learner that guarantee that the regret grows
+sublinearly. Since it is well known that no deterministic learning algorithm can achieve this goal
+[10], we are interested in randomized algorithms. Accordingly, the regret RT then becomes a ran-
+dom variable that we need to bound in some probabilistic sense. Most of the existing literature on
+non-stochastic bandits is concerned with bounding the pseudo-regret (or weak regret) deﬁned as
+
+(cid:34) T(cid:88)
+
+(cid:96)t,It − T(cid:88)
+
+t=1
+
+t=1
+
+(cid:98)RT = max
+
+i∈[K]
+
+E
+
+(cid:35)
+
+(cid:96)t,i
+
+,
+
+where the expectation integrates over the randomness injected by the learner. Proving bounds on
+the actual regret that hold with high probability is considered to be a signiﬁcantly harder task that
+can be achieved by serious changes made to the learning algorithms and much more complicated
+analyses. One particular common belief is that in order to guarantee high-conﬁdence performance
+guarantees, the learner cannot avoid repeatedly sampling arms from a uniform distribution, typically
+
+KT(cid:1) times [5, 4, 7, 9]. It is easy to see that such explicit exploration can impact the empirical
+
+Ω(cid:0)√
+
+performance of learning algorithms in a very negative way if there are many arms with high losses:
+even if the base learning algorithm quickly learns to focus on good arms, explicit exploration still
+forces the regret to grow at a steady rate. As a result, algorithms with high-probability performance
+guarantees tend to perform poorly even in very simple problems [25, 7].
+In the current paper, we propose an algorithm that guarantees strong regret bounds that hold with
+high probability without the explicit exploration component. One component that we preserve from
+the classical recipe for such algorithms is the biased estimation of losses, although our bias is of
+a much more delicate nature, and arguably more elegant than previous approaches. In particular,
+we adopt the implicit exploration (IX) strategy ﬁrst proposed by Koc´ak, Neu, Valko, and Munos
+[19] for the problem of online learning with side-observations. As we show in the current pa-
+per, this simple loss-estimation strategy allows proving high-probability bounds for a range of non-
+stochastic bandit problems including bandits with expert advice, tracking the best arm and bandits
+with side-observations. Our proofs are arguably cleaner and less involved than previous ones, and
+very elementary in the sense that they do not rely on advanced results from probability theory like
+Freedman’s inequality [12]. The resulting bounds are tighter than all previously known bounds and
+hold simultaneously for all conﬁdence levels, unlike most previously known bounds [5, 7]. For the
+ﬁrst time in the literature, we also provide high-probability bounds for anytime algorithms that do
+not require prior knowledge of the time horizon T . A minor conceptual improvement in our analysis
+is a direct treatment of the loss game, as opposed to previous analyses that focused on the reward
+game, making our treatment more coherent with other state-of-the-art results in the online learning
+literature1.
+The rest of the paper is organized as follows. In Section 2, we review the known techniques for prov-
+ing high-probability regret bounds for non-stochastic bandits and describe our implicit exploration
+strategy in precise terms. Section 3 states our main result concerning the concentration of the IX
+loss estimates and shows applications of this result to several problem settings. Finally, we conduct
+a set of simple experiments to illustrate the beneﬁts of implicit exploration over previous techniques
+in Section 4.
+
+2 Explicit and implicit exploration
+
+Most principled learning algorithms for the non-stochastic bandit problem are constructed by using
+a standard online learning algorithm such as the exponentially weighted forecaster ([26, 20, 13])
+or follow the perturbed leader ([14, 18]) as a black box, with the true (unobserved) losses replaced
+by some appropriate estimates. One of the key challenges is constructing reliable estimates of the
+losses (cid:96)t,i for all i ∈ [K] based on the single observation (cid:96)t,It. Following Auer et al. [5], this is
+1In fact, studying the loss game is colloquially known to allow better constant factors in the bounds in many
+
+settings (see, e.g., Bubeck and Cesa-Bianchi [9]). Our result further reinforces these observations.
+
+2
+
+(cid:98)(cid:96)t,i =
+
+(cid:98)rt,i =
+
+traditionally achieved by using importance-weighted loss/reward estimates of the form
+
+(cid:96)t,i
+pt,i
+
+I{It=i}
+
+rt,i
+pt,i
+
+I{It=i}
+
+or
+
+(1)
+where pt,i = P [ It = i|Ft−1] is the probability that the learner picks action i in round t, conditioned
+on the observation history Ft−1 of the learner up to the beginning of round t. It is easy to show that
+
+these estimates are unbiased for all i with pt,i > 0 in the sense that E(cid:98)(cid:96)t,i = (cid:96)t,i for all such i.
+to compute the weights wt,i = exp(cid:0)−η(cid:80)t−1
+
+s=1(cid:98)(cid:96)s−1,i
+
+For concreteness, consider the EXP3 algorithm of Auer et al. [5] as described in Bubeck and Cesa-
+Bianchi [9, Section 3]. In every round t, this algorithm uses the loss estimates deﬁned in Equation (1)
+
+(cid:1) for all i and some positive parameter η that
+
+is often called the learning rate. Having computed these weights, EXP3 draws arm It = i with
+probability proportional to wt,i. Relying on the unbiasedness of the estimates (1) and an optimized
+setting of η, one can prove that EXP3 enjoys a pseudo-regret bound of
+2T K log K. However, the
+ﬂuctuations of the loss estimates around the true losses are too large to permit bounding the true
+regret with high probability. To keep these ﬂuctuations under control, Auer et al. [5] propose to use
+the biased reward-estimates
+
+√
+
+with an appropriately chosen β > 0. Given these estimates, the EXP3.P algorithm of Auer et al. [5]
+
+(cid:101)rt,i =(cid:98)rt,i +
+computes the weights wt,i = exp(cid:0)η(cid:80)t−1
+s=1(cid:101)rs,i
+
+β
+pt,i
+
+distribution
+
+pt,i = (1 − γ)
+
+(2)
+
+(cid:1) for all arms i and then samples It according to the
+wt,i(cid:80)K
+
++
+
+γ
+K
+
+,
+
+j=1 wt,j
+
+where γ ∈ [0, 1] is the exploration parameter. The argument for this explicit exploration is that it
+helps to keep the range (and thus the variance) of the above reward estimates bounded, thus enabling
+the use of (more or less) standard concentration results2. In particular, the key element in the analysis
+of EXP3.P [5, 9, 7, 6] is showing that the inequality
+
+T(cid:88)
+
+(rt,i −(cid:101)rt,i) ≤ log(K/δ)
+
+β
+
+cumulative estimates(cid:80)T
+
+holds simultaneously for all i with probability at least 1 − δ. In other words, this shows that the
+
+t=1(cid:101)rt,i are upper conﬁdence bounds for the true rewards(cid:80)T
+
+t=1 rt,i.
+
+t=1
+
+In the current paper, we propose to use the loss estimates deﬁned as
+
+(cid:101)(cid:96)t,i =
+
+(cid:96)t,i
+
+pt,i + γt
+
+I{It=i},
+
+(3)
+
+for all i and an appropriately chosen γt > 0, and then use the resulting estimates in an exponential-
+weights algorithm scheme without any explicit exploration. Loss estimates of this form were ﬁrst
+used by Koc´ak et al. [19]—following them, we refer to this technique as Implicit eXploration, or,
+in short, IX. In what follows, we argue that that IX as deﬁned above achieves a similar variance-
+reducing effect as the one achieved by the combination of explicit exploration and the biased reward
+estimates of Equation (2). In particular, we show that the IX estimates (3) constitute a lower con-
+ﬁdence bound for the true losses which allows proving high-probability bounds for a number of
+variants of the multi-armed bandit problem.
+
+3 High-probability regret bounds via implicit exploration
+
+In this section, we present a concentration result concerning the IX loss estimates of Equation (3),
+and apply this result to prove high-probability performance guarantees for a number of non-
+stochastic bandit problems. The following lemma states our concentration result in its most general
+form:
+
+2Explicit exploration is believed to be inevitable for proving bounds in the reward game for various other
+
+reasons, too—see Bubeck and Cesa-Bianchi [9] for a discussion.
+
+3
+
+Lemma 1. Let (γt) be a ﬁxed non-increasing sequence with γt ≥ 0 and let αt,i be nonnegative
+Ft−1-measurable random variables satisfying αt,i ≤ 2γt for all t and i. Then, with probability at
+least 1 − δ,
+
+(cid:16)(cid:101)(cid:96)t,i − (cid:96)t,i
+
+(cid:17) ≤ log (1/δ) .
+
+αt,i
+
+T(cid:88)
+
+K(cid:88)
+
+t=1
+
+i=1
+
+A particularly important special case of the above lemma is the following:
+Corollary 1. Let γt = γ ≥ 0 for all t. With probability at least 1 − δ,
+
+(cid:16)(cid:101)(cid:96)t,i − (cid:96)t,i
+
+(cid:17) ≤ log (K/δ)
+
+.
+
+2γ
+
+T(cid:88)
+
+t=1
+
+simultaneously holds for all i ∈ [K].
+This corollary follows from applying Lemma 1 to the functions αt,i = 2γI{i=j} for all j and
+applying the union bound. The full proof of Lemma 1 is presented in the Appendix. For didactic
+purposes, we now present a direct proof for Corollary 1, which is essentially a simpler version of
+Lemma 1.
+
+Proof of Corollary 1. For convenience, we will use the notation β = 2γ. First, observe that
+
+(cid:16)
+
+(cid:17)
+1 + β(cid:98)(cid:96)t,i
+1+z/2 ≤
+
+,
+
+z
+
+(cid:101)(cid:96)t,i =
+
+(cid:96)t,i
+
+pt,i + γ
+
+I{It=i} ≤
+(cid:16)
+
+exp
+
+(cid:96)t,i
+
+pt,i + γ(cid:96)t,i
+
+I{It=i} =
+
+1
+2γ
+
+· 2γ(cid:96)t,i/pt,i
+1 + γ(cid:96)t,i/pt,i
+
+I{It=i} ≤ 1
+β
+
+· log
+
+(cid:105) ≤E(cid:104)
+
+1 + β(cid:98)(cid:96)t,i
+
+where the ﬁrst step follows from (cid:96)t,i ∈ [0, 1] and last one from the elementary inequality
+log(1 + z) that holds for all z ≥ 0. Using the above inequality, we get that
+
+(cid:17)(cid:12)(cid:12)(cid:12)Ft−1
+(cid:12)(cid:12)(cid:12)Ft−1
+E(cid:104)
+(cid:105) ≤ 1 + β(cid:96)t,i ≤ exp (β(cid:96)t,i) ,
+β(cid:101)(cid:96)t,i
+(cid:12)(cid:12)(cid:12)Ft−1
+where the second and third steps are obtained by using E(cid:104)(cid:98)(cid:96)t,i
+(cid:105) ≤ (cid:96)t,i that holds by deﬁnition
+of (cid:98)(cid:96)t,i, and the inequality 1 + z ≤ ez that holds for all z ∈ R. As a result, the process Zt =
+(cid:0)(cid:101)(cid:96)s,i − (cid:96)s,i
+exp(cid:0)β(cid:80)t
+(cid:1)(cid:1) is a supermartingale with respect to (Ft): E [ Zt|Ft−1] ≤ Zt−1. Observe
+(cid:1)(cid:33)(cid:35)
+(cid:34) T(cid:88)
+(cid:35)
+(cid:1) > ε
+(cid:0)(cid:101)(cid:96)t,i − (cid:96)t,i
+
+(cid:0)(cid:101)(cid:96)t,i − (cid:96)t,i
+
+that, since Z0 = 1, this implies E [ZT ] ≤ E [ZT−1] ≤ . . . ≤ 1, and thus by Markov’s inequality,
+
+s=1
+
+· exp(−βε) ≤ exp(−βε)
+
+T(cid:88)
+
+exp
+
+β
+
+≤ E
+
+(cid:32)
+
+(cid:34)
+
+P
+
+t=1
+
+t=1
+
+holds for any ε > 0. The statement of the lemma follows from solving exp(−βε) = δ/K for ε and
+using the union bound over all arms i.
+
+In what follows, we put Lemma 1 to use and prove improved high-probability performance guaran-
+tees for several well-studied variants of the non-stochastic bandit problem, namely, the multi-armed
+bandit problem with expert advice, tracking the best arm for multi-armed bandits, and bandits with
+side-observations. The general form of Lemma 1 will allow us to prove high-probability bounds for
+anytime algorithms that can operate without prior knowledge of T . For clarity, we will only provide
+such bounds for the standard multi-armed bandit setting; extending the derivations to other settings
+is left as an easy exercise. For all algorithms, we prove bounds that scale linearly with log(1/δ) and
+
+hold simultaneously for all levels δ. Note that this dependence can be improved to(cid:112)log(1/δ) for a
+
+ﬁxed conﬁdence level δ, if the algorithm can use this δ to tune its parameters. This is the way that
+Table 1 presents our new bounds side-by-side with the best previously known ones.
+
+4
+
+Setting
+Multi-armed bandits
+Bandits with expert advice
+Tracking the best arm
+Bandits with side-observations
+
+Best known regret bound Our new regret bound
+
+5.15(cid:112)T K log(K/δ)
+6(cid:112)T K log(N/δ)
+7(cid:112)KT S log(KT /δS)
+mT(cid:1)
+(cid:101)O(cid:0)√
+
+2(cid:112)2T K log(K/δ)
+2(cid:112)2T K log(N/δ)
+2(cid:112)2KT S log(KT /δS)
+αT(cid:1)
+(cid:101)O(cid:0)√
+
+Table 1: Our results compared to the best previously known results in the four settings considered
+in Sections 3.1–3.4. See the respective sections for references and notation.
+
+3.1 Multi-armed bandits
+
+In this section, we propose a variant of the
+EXP3 algorithm of Auer et al. [5] that uses the
+IX loss estimates (3): EXP3-IX. The algorithm
+in its most general form uses two nonincreasing
+sequences of nonnegative parameters: (ηt) and
+(γt). In every round, EXP3-IX chooses action
+It = i with probability proportional to
+
+pt,i ∝ wt,i = exp
+
+−ηt
+
+,
+
+(4)
+
+(cid:32)
+
+(cid:33)
+
+t−1(cid:88)
+
+s=1
+
+(cid:101)(cid:96)s,i
+
+Algorithm 1 EXP3-IX
+Parameters: η > 0, γ > 0.
+Initialization: w1,i = 1.
+for t = 1, 2, . . . , T , repeat
+1. pt,i = wt,i(cid:80)K
+.
+2. Draw It ∼ pt = (pt,1, . . . , pt,K).
+4. (cid:101)(cid:96)t,i ← (cid:96)t,i
+3. Observe loss (cid:96)t,It.
+I{It=i} for all i ∈ [K].
+5. wt+1,i ← wt,ie−η(cid:101)(cid:96)t,i for all i ∈ [K].
+
+j=1 wt,j
+
+pt,i+γ
+
+without mixing any explicit exploration term
+into the distribution. A ﬁxed-parameter version
+of EXP3-IX is presented as Algorithm 1.
+√
+Our theorem below states a high-probability bound on the regret of EXP3-IX. Notably, our bound
+exhibits the best known constant factor of 2
+2 in the leading term, improving on the factor of 5.15
+due to Bubeck and Cesa-Bianchi [9]. The best known leading constant for the pseudo-regret bound
+of EXP3 is
+Theorem 1. Fix an arbitrary δ > 0. With ηt = 2γt =
+
+2, also proved in Bubeck and Cesa-Bianchi [9].
+
+for all t, EXP3-IX guarantees
+
+(cid:113) 2 log K
+
+√
+
+with probability at least 1−δ. Furthermore, setting ηt = 2γt =
+
+for all t, the bound becomes
+
+Proof. Let us ﬁx an arbitrary δ(cid:48) ∈ (0, 1). Following the standard analysis of EXP3 in the loss game
+and nonincreasing learning rates [9], we can obtain the bound
+
+KT
+
+2KT
+log K
+
++ 1
+
+log (2/δ)
+
+(cid:33)
+(cid:113) log K
+(cid:33)
+
+Kt
+
+2
+
+KT
+log K
+
++ 1
+
+log (2/δ) .
+
+(cid:32)(cid:115)
+
+(cid:115)
+
+RT ≤ 2(cid:112)2KT log K +
+(cid:32)
+RT ≤ 4(cid:112)KT log K +
+(cid:33)
+(cid:32) K(cid:88)
+
+pt,i(cid:101)(cid:96)t,i −(cid:101)(cid:96)t,j
+
+T(cid:88)
+
+K(cid:88)
+
+≤ log K
+ηT
+
++
+
+ηt
+2
+
+t=1
+
+i=1
+
+pt,i
+
+(cid:17)2
+
+(cid:16)(cid:101)(cid:96)t,i
+
+K(cid:88)
+
+(cid:96)t,i (pt,i + γt)
+
+− γt
+
+pt,i + γt
+
+I{It=i}
+
+(cid:101)(cid:96)t,i.
+i=1(cid:101)(cid:96)t,i holds by the boundedness of the losses. Thus, we get that
+(cid:16)
+
+= (cid:96)t,It − γt
+(cid:101)(cid:96)t,i
+
+(cid:17) K(cid:88)
+
+pt,i + γt(cid:96)t,i
+
+log K
+
+(cid:17)
+
+(cid:96)t,i
+
+i=1
+
+i=1
+
++
+
++
+
+K(cid:88)
+
+(5)
+
+(cid:96)t,j −(cid:101)(cid:96)t,j
+≤ log (K/δ(cid:48))
+
+t=1
+
++
+
+2γ
+
+T(cid:88)
+(cid:16) ηt
+
+t=1
+
+(cid:16) ηt
+(cid:17) K(cid:88)
+
++ γt
+
+2
+
++ γt
+
+i=1
+
+ηT
+
+T(cid:88)
+
++
+
+2
+
+t=1
+
+i=1
+
+(cid:96)t,i + log (1/δ(cid:48))
+
+log K
+
+η
+
+5
+
+t=1
+
+i=1
+for any j. Now observe that
+
+T(cid:88)
+K(cid:88)
+K(cid:88)
+pt,i(cid:101)(cid:96)t,i =
+Similarly,(cid:80)K
+t,i ≤(cid:80)K
+i=1 pt,i(cid:101)(cid:96)2
+((cid:96)t,It − (cid:96)t,j) ≤ T(cid:88)
+T(cid:88)
+
+I{It=i}
+
+i=1
+
+i=1
+
+t=1
+
+holds with probability at least 1 − 2δ(cid:48), where the last line follows from an application of Lemma 1
+with αt,i = ηt/2 + γt for all t, i and taking the union bound. By taking j = arg mini LT,i and
+δ(cid:48) = δ/2, and using the boundedness of the losses, we obtain
+
+(cid:17)
+The statements of the theorem then follow immediately, noting that(cid:80)T
+
+RT ≤ log (2K/δ)
+
+(cid:16) ηt
+
+T(cid:88)
+
+log K
+
++ γt
+
++ K
+
+2γT
+
+ηT
+
+t=1
+
++
+
+2
+
++ log (2/δ) .
+√
+t=1 1/
+
+√
+t ≤ 2
+
+T .
+
+3.2 Bandits with expert advice
+
+ξt(1), ξt(2), . . . , ξt(N ) ∈ [0, 1]K over the K arms, such that(cid:80)K
+
+We now turn to the setting of multi-armed bandits with expert advice, as deﬁned in Auer et al. [5],
+and later revisited by McMahan and Streeter [22] and Beygelzimer et al. [7]. In this setting, we
+assume that in every round t = 1, 2, . . . , T , the learner observes a set of N probability distributions
+i=1 ξt,i(n) = 1 for all n ∈ [N ].
+We assume that the sequences (ξt(n)) are measurable with respect to (Ft). The nthof these vectors
+represent the probabilistic advice of the corresponding nth expert. The goal of the learner in this
+setting is to pick a sequence of arms so as to minimize the regret against the best expert:
+
+T(cid:88)
+
+t=1
+
+T(cid:88)
+
+K(cid:88)
+
+t=1
+
+i=1
+
+Rξ
+
+T =
+
+(cid:96)t,It − min
+n∈[N ]
+
+ξt,i(n)(cid:96)t,i → min .
+
+To tackle this problem, we propose a modiﬁcation of the EXP4 algorithm of Auer et al. [5] that uses
+the IX loss estimates (3), and also drops the explicit exploration component of the original algorithm.
+Speciﬁcally, EXP4-IX uses the loss estimates deﬁned in Equation (3) to compute the weights
+
+(cid:32)
+
+−η
+
+t−1(cid:88)
+
+K(cid:88)
+
+ξs,i(n)(cid:101)(cid:96)s,i
+
+(cid:33)
+
+wt,n = exp
+
+for every expert n ∈ [N ], and then draw arm i with probability pt,i ∝(cid:80)N
+
+n=1 wt,nξt,i(n). We now
+√
+state the performance guarantee of EXP4-IX. Our bound improves the best known leading constant
+2 and is a factor of 2 worse than the best known constant in
+of 6 due to Beygelzimer et al. [7] to 2
+the pseudo-regret bound for EXP4 [9]. The proof of the theorem is presented in the Appendix.
+
+s=1
+
+i=1
+
+for all t. Then, with probability at
+
+Theorem 2. Fix an arbitrary δ > 0 and set η = 2γ =
+least 1 − δ, the regret of EXP4-IX satisﬁes
+
+T ≤ 2(cid:112)2KT log N +
+
+Rξ
+
+(cid:32)(cid:115)
+
+3.3 Tracking the best sequence of arms
+
+(cid:113) 2 log N
+(cid:33)
+
+KT
+
+2KT
+log N
+
++ 1
+
+log (2/δ) .
+
+In this section, we consider the problem of competing with sequences of actions. Similarly to
+Herbster and Warmuth [17], we consider the class of sequences that switch at most S times between
+actions. We measure the performance of the learner in this setting in terms of the regret against the
+best sequence from this class C(S) ⊆ [K]T , deﬁned as
+
+T(cid:88)
+
+t=1
+
+RS
+
+T =
+
+(cid:96)t,It − min
+
+(Jt)∈C(S)
+
+(cid:96)t,Jt.
+
+Similarly to Auer et al. [5], we now propose to adapt the Fixed Share algorithm of Herbster and
+Warmuth [17] to our setting. Our algorithm, called EXP3-SIX, updates a set of weights wt,· over
+the arms in a recursive fashion. In the ﬁrst round, EXP3-SIX sets w1,i = 1/K for all i. In the
+following rounds, the weights are updated for every arm i as
+
+wt+1,i = (1 − α)wt,i · e−η(cid:101)(cid:96)t,i +
+
+wt,j · e−η(cid:101)(cid:96)t,j .
+
+T(cid:88)
+
+t=1
+
+K(cid:88)
+
+j=1
+
+α
+K
+
+6
+
+In round t, the algorithm draws arm It = i with probability pt,i ∝ wt,i. Below, we give the
+√
+performance guarantees of EXP3-SIX. Note that our leading factor of 2
+2 again improves over the
+best previously known leading factor of 7, shown by Audibert and Bubeck [3]. The proof of the
+theorem is given in the Appendix.
+
+Theorem 3. Fix an arbitrary δ > 0 and set η = 2γ =
+Then, with probability at least 1 − δ, the regret of EXP3-SIX satisﬁes
+
+KT
+
+and α = S
+
+T−1 , where ¯S = S + 1.
+
+(cid:113) 2 ¯S log K
+(cid:32)(cid:115)
+
+2KT
+¯S log K
+
+(cid:33)
+
+(cid:115)
+T ≤ 2
+RS
+
+(cid:18) eKT
+
+(cid:19)
+
++
+
+S
+
+2KT ¯S log
+
++ 1
+
+log (2/δ) .
+
+3.4 Bandits with side-observations
+
+Let us now turn to the problem of online learning in bandit problems in the presence of side ob-
+servations, as deﬁned by Mannor and Shamir [21] and later elaborated by Alon et al. [1]. In this
+setting, the learner and the environment interact exactly as in the multi-armed bandit problem, the
+main difference being that in every round, the learner observes the losses of some arms other than
+its actually chosen arm It. The structure of the side observations is described by the directed graph
+G: nodes of G correspond to individual arms, and the presence of arc i → j implies that the learner
+will observe (cid:96)t,j upon selecting It = i.
+Implicit exploration and EXP3-IX was ﬁrst proposed by Koc´ak et al. [19] for this precise setting.
+To describe this variant, let us introduce the notations Ot,i = I{It=i} + I{(It→i)∈G} and ot,i =
+.
+ot,i+γt
+With these estimates at hand, EXP3-IX draws arm It from the exponentially weighted distribution
+deﬁned in Equation (4). The following theorem provides the regret bound concerning this algorithm.
+Theorem 4. Fix an arbitrary δ > 0. Assume that T ≥ K 2/(8α) and set η = 2γ =
+2αT log(KT ) ,
+where α is the independence number of G. With probability at least 1 − δ, EXP3-IX guarantees
+
+E [ Ot,i|Ft−1]. Then, the IX loss estimates in this setting are deﬁned for all t, i as(cid:101)(cid:96)t,i = Ot,i(cid:96)t,i
+(cid:113) log K
+(cid:114)
+
+(cid:115)
+2αT(cid:0)log2K +log KT(cid:1)+2
+
+(cid:17)·(cid:113)
+4+2(cid:112)log (4/δ)
+
+RT ≤(cid:16)
+
+αT log(KT )
+
+log (4/δ)+
+
+T log(4/δ)
+
+.
+
+2
+
+log K
+
+The proof of the theorem is given in the Appendix. While the proof of this statement is signiﬁcantly
+more involved than the other proofs presented in this paper, it provides a fundamentally new result.
+In particular, our bound is in terms of the independence number α and thus matches the minimax
+regret bound proved by Alon et al. [1] for this setting up to logarithmic factors. In contrast, the only
+high-probability regret bound for this setting due to Alon et al. [2] scales with the size m of the
+maximal acyclic subgraph of G, which can be much larger than α in general (i.e., m may be o(α)
+for some graphs [1]).
+
+4 Empirical evaluation
+We conduct a simple experiment to demonstrate the robustness of EXP3-IX as compared to EXP3
+and its superior performance as compared to EXP3.P. Our setting is a 10-arm bandit problem where
+all losses are independent draws of Bernoulli random variables. The mean losses of arms 1 through
+8 are 1/2 and the mean loss of arm 9 is 1/2 − ∆ for all rounds t = 1, 2, . . . , T . The mean losses of
+arm 10 are changing over time: for rounds t ≤ T /2, the mean is 1/2 + ∆, and 1/2− 4∆ afterwards.
+This choice ensures that up to at least round T /2, arm 9 is clearly better than other arms. In the
+second half of the game, arm 10 starts to outperform arm 9 and eventually becomes the leader.
+We have evaluated the performance of EXP3, EXP3.P and EXP3-IX in the above setting with T =
+106 and ∆ = 0.1. For fairness of comparison, we evaluate all three algorithms for a wide range
+of parameters. In particular, for all three algorithms, we set a base learning rate η according to the
+best known theoretical results [9, Theorems 3.1 and 3.3] and varied the multiplier of the respective
+base parameters between 0.01 and 100. Other parameters are set as γ = η/2 for EXP3-IX and
+β = γ/K = η for EXP3.P. We studied the regret up to two interesting rounds in the game: up
+to T /2, where the losses are i.i.d., and up to T where the algorithms have to notice the shift in the
+
+7
+
+Figure 1: Regret of EXP3, EXP3.P, and EXP3-IX, respectively in the problem described in Sec-
+tion 4.
+
+√
+
+√
+
+T ) times is necessary for achieving near-optimal guarantees.
+
+loss distributions. Figure 1 shows the empirical means and standard deviations over 50 runs of the
+regrets of the three algorithms as a function of the multipliers. The results clearly show that EXP3-
+IX largely improves on the empirical performance of EXP3.P and is also much more robust in the
+non-stochastic regime than vanilla EXP3.
+5 Discussion
+In this paper, we have shown that, contrary to popular belief, explicit exploration is not necessary to
+achieve high-probability regret bounds for non-stochastic bandit problems. Interestingly, however,
+we have observed in several of our experiments that our IX-based algorithms still draw every arm
+roughly
+T times, even though this is not explicitly enforced by the algorithm. This suggests a need
+for a more complete study of the role of exploration, to ﬁnd out whether pulling every single arm
+Ω(
+One can argue that tuning the IX parameter that we introduce may actually be just as difﬁcult in
+practice as tuning the parameters of EXP3.P. However, every aspect of our analysis suggests that
+γt = ηt/2 is the most natural choice for these parameters, and thus this is the choice that we
+recommend. One limitation of our current analysis is that it only permits deterministic learning-rate
+and IX parameters (see the conditions of Lemma 1). That is, proving adaptive regret bounds in the
+vein of [15, 24, 23] that hold with high probability is still an open challenge.
+Another interesting direction for future work is whether the implicit exploration approach can help in
+advancing the state of the art in the more general setting of linear bandits. All known algorithms for
+this setting rely on explicit exploration techniques, and the strength of the obtained results depend
+crucially on the choice of the exploration distribution (see [8, 16] for recent advances). Interestingly,
+IX has a natural extension to the linear bandit problem. To see this, consider the vector Vt = eIt and
+the matrix Pt = E [VtV T
+t (cid:96)t.
+Whether or not this estimate is the right choice for linear bandits remains to be seen.
+Finally, we note that our estimates (3) are certainly not the only ones that allow avoiding explicit
+exploration.
+In fact, the careful reader might deduce from the proof of Lemma 1 that the same
+concentration can be shown to hold for the alternative loss estimates (cid:96)t,iI{It=i}/ (pt,i + γ(cid:96)t,i) and
+
+t ]. Then, the IX loss estimates can be written as(cid:101)(cid:96)t = (Pt + γI)−1VtV T
+(cid:1)/(2γ). Actually, a variant of the latter estimate was used previously for
+
+log(cid:0)1 + 2γ(cid:96)t,iI{It=i}/pt,i
+
+proving high-probability regret bounds in the reward game by Audibert and Bubeck [4]—however,
+their proof still relied on explicit exploration. It is not hard to verify that all the results we presented
+in this paper (except Theorem 4) can be shown to hold for the above two estimates, too.
+
+Acknowledgments This work was supported by INRIA, the French Ministry of Higher Education
+and Research, and by FUI project Herm`es. The author wishes to thank Haipeng Luo for catching a
+bug in an earlier version of the paper, and the anonymous reviewers for their helpful suggestions.
+
+8
+
+10−210−110010110200.511.522.533.544.55x104ηmultiplierregretatT/2EXP3EXP3.PEXP3−IX10−210−1100101102−1.5−1−0.500.511.5x105ηmultiplierregretatTEXP3EXP3.PEXP3−IXReferences
+[1] N. Alon, N. Cesa-Bianchi, C. Gentile, and Y. Mansour. From Bandits to Experts: A Tale of Domination
+
+and Independence. In NIPS-25, pages 1610–1618, 2012.
+
+[2] N. Alon, N. Cesa-Bianchi, C. Gentile, S. Mannor, Y. Mansour, and O. Shamir. Nonstochastic multi-armed
+
+bandits with graph-structured feedback. arXiv preprint arXiv:1409.8428, 2014.
+
+[3] J.-Y. Audibert and S. Bubeck. Minimax policies for adversarial and stochastic bandits. In Proceedings of
+
+the 22nd Annual Conference on Learning Theory (COLT), 2009.
+
+[4] J.-Y. Audibert and S. Bubeck. Regret bounds and minimax policies under partial monitoring. Journal of
+
+Machine Learning Research, 11:2785–2836, 2010.
+
+[5] P. Auer, N. Cesa-Bianchi, Y. Freund, and R. E. Schapire. The nonstochastic multiarmed bandit problem.
+
+SIAM J. Comput., 32(1):48–77, 2002. ISSN 0097-5397.
+
+[6] P. L. Bartlett, V. Dani, T. P. Hayes, S. Kakade, A. Rakhlin, and A. Tewari. High-probability regret bounds
+
+for bandit online linear optimization. In COLT, pages 335–342, 2008.
+
+[7] A. Beygelzimer, J. Langford, L. Li, L. Reyzin, and R. E. Schapire. Contextual bandit algorithms with
+
+supervised learning guarantees. In AISTATS 2011, pages 19–26, 2011.
+
+[8] S. Bubeck, N. Cesa-Bianchi, and S. M. Kakade. Towards minimax policies for online linear optimization
+
+with bandit feedback. 2012.
+
+[9] S. Bubeck and N. Cesa-Bianchi. Regret Analysis of Stochastic and Nonstochastic Multi-armed Bandit
+
+Problems. Now Publishers Inc, 2012.
+
+[10] N. Cesa-Bianchi and G. Lugosi. Prediction, Learning, and Games. Cambridge University Press, New
+
+York, NY, USA, 2006.
+
+[11] N. Cesa-Bianchi, P. Gaillard, G. Lugosi, and G. Stoltz. Mirror descent meets ﬁxed share (and feels no
+
+regret). In NIPS-25, pages 989–997. 2012.
+
+[12] D. A. Freedman. On tail probabilities for martingales. The Annals of Probability, 3:100–118, 1975.
+[13] Y. Freund and R. E. Schapire. A decision-theoretic generalization of on-line learning and an application
+
+to boosting. Journal of Computer and System Sciences, 55:119–139, 1997.
+
+[14] J. Hannan. Approximation to Bayes risk in repeated play. Contributions to the theory of games, 3:97–139,
+
+1957.
+
+[15] E. Hazan and S. Kale. Better algorithms for benign bandits. The Journal of Machine Learning Research,
+
+12:1287–1311, 2011.
+
+[16] E. Hazan, Z. Karnin, and R. Meka. Volumetric spanners: an efﬁcient exploration basis for learning. In
+
+COLT, pages 408–422, 2014.
+
+[17] M. Herbster and M. Warmuth. Tracking the best expert. Machine Learning, 32:151–178, 1998.
+[18] A. Kalai and S. Vempala. Efﬁcient algorithms for online decision problems. Journal of Computer and
+
+System Sciences, 71:291–307, 2005.
+
+[19] T. Koc´ak, G. Neu, M. Valko, and R. Munos. Efﬁcient learning by implicit exploration in bandit problems
+
+with side observations. In NIPS-27, pages 613–621, 2014.
+
+[20] N. Littlestone and M. Warmuth. The weighted majority algorithm. Information and Computation, 108:
+
+212–261, 1994.
+
+[21] S. Mannor and O. Shamir. From Bandits to Experts: On the Value of Side-Observations.
+
+Information Processing Systems, 2011.
+
+In Neural
+
+[22] H. B. McMahan and M. Streeter. Tighter bounds for multi-armed bandits with expert advice. In COLT,
+
+2009.
+
+[23] G. Neu. First-order regret bounds for combinatorial semi-bandits. In COLT, pages 1360–1375, 2015.
+[24] A. Rakhlin and K. Sridharan. Online learning with predictable sequences. In COLT, pages 993–1019,
+
+2013.
+
+[25] Y. Seldin, N. Cesa-Bianchi, P. Auer, F. Laviolette, and J. Shawe-Taylor. PAC-Bayes-Bernstein inequality
+for martingales and its application to multiarmed bandits. In Proceedings of the Workshop on On-line
+Trading of Exploration and Exploitation 2, 2012.
+
+[26] V. Vovk. Aggregating strategies. In Proceedings of the third annual workshop on Computational learning
+
+theory (COLT), pages 371–386, 1990.
+
+9
+
+

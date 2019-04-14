@@ -1,0 +1,1441 @@
+The Poisson Gamma Belief Network
+
+Mingyuan Zhou
+
+McCombs School of Business
+
+The University of Texas at Austin
+
+Austin, TX 78712, USA
+
+Yulai Cong
+
+Bo Chen
+
+National Laboratory of RSP
+
+National Laboratory of RSP
+
+Xidian University
+
+Xi’an, Shaanxi, China
+
+Xidian University
+
+Xi’an, Shaanxi, China
+
+Abstract
+
+To infer a multilayer representation of high-dimensional count vectors, we pro-
+pose the Poisson gamma belief network (PGBN) that factorizes each of its layers
+into the product of a connection weight matrix and the nonnegative real hidden
+units of the next layer. The PGBN’s hidden layers are jointly trained with an
+upward-downward Gibbs sampler, each iteration of which upward samples Dirich-
+let distributed connection weight vectors starting from the ﬁrst layer (bottom data
+layer), and then downward samples gamma distributed hidden units starting from
+the top hidden layer. The gamma-negative binomial process combined with a
+layer-wise training strategy allows the PGBN to infer the width of each layer given
+a ﬁxed budget on the width of the ﬁrst layer. The PGBN with a single hidden layer
+reduces to Poisson factor analysis. Example results on text analysis illustrate in-
+teresting relationships between the width of the ﬁrst layer and the inferred network
+structure, and demonstrate that the PGBN, whose hidden units are imposed with
+correlated gamma priors, can add more layers to increase its performance gains
+over Poisson factor analysis, given the same limit on the width of the ﬁrst layer.
+
+1
+
+Introduction
+
+There has been signiﬁcant recent interest in deep learning. Despite its tremendous success in su-
+pervised learning, inferring a multilayer data representation in an unsupervised manner remains a
+challenging problem [1, 2, 3]. The sigmoid belief network (SBN), which connects the binary units
+of adjacent layers via the sigmoid functions, infers a deep representation of multivariate binary vec-
+tors [4, 5]. The deep belief network (DBN) [6] is a SBN whose top hidden layer is replaced by the
+restricted Boltzmann machine (RBM) [7] that is undirected. The deep Boltzmann machine (DBM)
+is an undirected deep network that connects the binary units of adjacent layers using the RBMs [8].
+All these deep networks are designed to model binary observations. Although one may modify the
+bottom layer to model Gaussian and multinomial observations, the hidden units of these networks
+are still typically restricted to be binary [8, 9, 10]. One may further consider the exponential family
+harmoniums [11, 12] to construct more general networks with non-binary hidden units, but often at
+the expense of noticeably increased complexity in training and data ﬁtting.
+Moving beyond conventional deep networks using binary hidden units, we construct a deep directed
+network with gamma distributed nonnegative real hidden units to unsupervisedly infer a multilayer
+representation of multivariate count vectors, with a simple but powerful mechanism to capture the
+correlations among the visible/hidden features across all layers and handle highly overdispersed
+counts. The proposed model is called the Poisson gamma belief network (PGBN), which factorizes
+the observed count vectors under the Poisson likelihood into the product of a factor loading matrix
+and the gamma distributed hidden units (factor scores) of layer one; and further factorizes the shape
+parameters of the gamma hidden units of each layer into the product of a connection weight matrix
+and the gamma hidden units of the next layer. Distinct from previous deep networks that often utilize
+binary units for tractable inference and require tuning both the width (number of hidden units) of
+each layer and the network depth (number of layers), the PGBN employs nonnegative real hidden
+
+1
+
+units and automatically infers the widths of subsequent layers given a ﬁxed budget on the width of
+its ﬁrst layer. Note that the budget could be inﬁnite and hence the whole network can grow without
+bound as more data are being observed. When the budget is ﬁnite and hence the ultimate capacity
+of the network is limited, we ﬁnd that the PGBN equipped with a narrower ﬁrst layer could increase
+its depth to match or even outperform a shallower network with a substantially wider ﬁrst layer.
+The gamma distribution density function has the highly desired strong non-linearity for deep learn-
+ing, but the existence of neither a conjugate prior nor a closed-form maximum likelihood estimate
+for its shape parameter makes a deep network with gamma hidden units appear unattractive. Despite
+seemingly difﬁcult, we discover that, by generalizing the data augmentation and marginalization
+techniques for discrete data [13], one may propagate latent counts one layer at a time from the bot-
+tom data layer to the top hidden layer, with which one may derive an efﬁcient upward-downward
+Gibbs sampler that, one layer at a time in each iteration, upward samples Dirichlet distributed con-
+nection weight vectors and then downward samples gamma distributed hidden units.
+In addition to constructing a new deep network that well ﬁts multivariate count data and developing
+an efﬁcient upward-downward Gibbs sampler, other contributions of the paper include: 1) combin-
+ing the gamma-negative binomial process [13, 14] with a layer-wise training strategy to automati-
+cally infer the network structure; 2) revealing the relationship between the upper bound imposed on
+the width of the ﬁrst layer and the inferred widths of subsequent layers; 3) revealing the relationship
+between the network depth and the model’s ability to model overdispersed counts; 4) and generating
+a multivariate high-dimensional random count vector, whose distribution is governed by the PGBN,
+by propagating the gamma hidden units of the top hidden layer back to the bottom data layer.
+
+a random count generated as l = (cid:80)n
+
+1.1 Useful count distributions and their relationships
+Let the Chinese restaurant table (CRT) distribution l ∼ CRT(n, r) represent the distribution of
+i=1 bi, bi ∼ Bernoulli [r/(r + i − 1)] . Its probability mass
+function (PMF) can be expressed as P (l | n, r) = Γ(r)rl
+Γ(n+r)|s(n, l)|, where l ∈ Z, Z := {0, 1, . . . , n},
+and |s(n, l)| are unsigned Stirling numbers of the ﬁrst kind. Let u ∼ Log(p) denote the logarithmic
+distribution with PMF P (u| p) =
+u , where u ∈ {1, 2, . . .}. Let n ∼ NB(r, p) denote
+n!Γ(r) pn(1 − p)r, where n ∈ Z.
+the negative binomial (NB) distribution with PMF P (n| r, p) = Γ(n+r)
+The NB distribution n ∼ NB(r, p) can be generated as a gamma mixed Poisson distribution as n ∼
+Pois(λ), λ ∼ Gam [r, p/(1 − p)] , where p/(1− p) is the gamma scale parameter. As shown in [13],
+the joint distribution of n and l given r and p in l ∼ CRT(n, r), n ∼ NB(r, p), where l ∈ {0, . . . , n}
+t=1 ut, ut ∼ Log(p), l ∼ Pois[−r ln(1 − p)], which is
+pn(1 − p)r.
+
+and n ∈ Z, is the same as that in n =(cid:80)l
+
+called the Poisson-logarithmic bivariate distribution, with PMF P (n, l | r, p) =
+
+1− ln(1−p)
+
+|s(n,l)|rl
+
+pu
+
+n!
+
+2 The Poisson Gamma Belief Network
+
+j ∈ ZK0, the generative model of the
+Assuming the observations are multivariate count vectors x(1)
+(cid:17)
+Poisson gamma belief network (PGBN) with T hidden layers, from top to bottom, is expressed as
+, 1(cid:14)c(t+1)
+
+Φ(t+1)θ(t+1)
+
+(cid:16)
+
+(cid:17)
+
+···
+
+,
+
+,
+
+j
+
+j ∼ Gam
+(cid:16)
+θ(T )
+j ∼ Gam
+(cid:17)
+θ(t)
+
+(cid:16)
+
+r, 1(cid:14)c(T +1)
+(cid:16)
+
+j
+
+···
+
+j
+
+(cid:14)(cid:0)1 − p(2)
+
+j
+
+(cid:1)(cid:17)
+
+j ∼ Pois
+x(1)
+
+j ∼ Gam
+
+j
+
+, θ(1)
+
+Φ(2)θ(2)
+
+Φ(1)θ(1)
+
+(1)
+into the product of the factor loading Φ(1) ∈
+The PGBN factorizes the count observation x(1)
++ of layer one under the Poisson likelihood, where R+ = {x :
+RK0×K1
+x ≥ 0}, and for t = 1, 2, . . . , T −1, factorizes the shape parameters of the gamma distributed hidden
++ of layer t into the product of the connection weight matrix Φ(t+1) ∈ RKt×Kt+1
+units θ(t)
+and the hidden units θ(t+1)
+share the same
+
+and hidden units θ(1)
+j ∈ RKt
+
+of layer t + 1; the top layer’s hidden units θ(T )
+
+j ∈ RK1
+
+∈ RKt+1
+
+, p(2)
+
++
+
++
+
+.
+
+j
+
+j
+
+j
+
+j
+
++
+
+j
+
+2
+
+vector r = (r1, . . . , rKT )(cid:48) as their gamma shape parameters; and the p(2)
+and {1/c(t)}3,T +1 are gamma scale parameters, with c(2)
+.
+For scale identiﬁabilty and ease of inference, each column of Φ(t) ∈ RKt−1×Kt
+a unit L1 norm. To complete the hierarchical model, for t ∈ {1, . . . , T − 1}, we let
+
+:=(cid:0)1 − p(2)
+(cid:1)(cid:14)p(2)
+(cid:1)
+k ∼ Dir(cid:0)η(t), . . . , η(t)(cid:1), rk ∼ Gam(cid:0)γ0/KT , 1/c0
+
+φ(t)
+
++
+
+j
+
+j
+
+j
+
+j
+
+is restricted to have
+
+(2)
+
+are probability parameters
+
+and impose c0 ∼ Gam(e0, 1/f0) and γ0 ∼ Gam(a0, 1/b0); and for t ∈ {3, . . . , T + 1}, we let
+
+j ∼ Beta(a0, b0),
+p(2)
+
+j ∼ Gam(e0, 1/f0).
+c(t)
+
+(3)
+We expect the correlations between the rows (features) of (x(1)
+J ) to be captured by the
+columns of Φ(1), and the correlations between the rows (latent features) of (θ(t)
+J ) to be
+captured by the columns of Φ(t+1). Even if all Φ(t) for t ≥ 2 are identity matrices, indicating no
+correlations between latent features, our analysis will show that a deep structure with T ≥ 2 could
+still beneﬁt data ﬁtting by better modeling the variability of the latent features θ(1)
+Sigmoid and deep belief networks. Under the hierarchical model in (1), given the connection
+weight matrices, the joint distribution of the count observations and gamma hidden units of the
+PGBN can be expressed, similar to those of the sigmoid and deep belief networks [3], as
+
+1 , . . . , x(1)
+
+1 , . . . , θ(t)
+
+.
+
+j
+
+P
+
+x(1)
+
+j
+
+,{θ(t)
+j }t
+
+= P
+
+x(1)
+
+j
+
+(cid:16)
+
+(cid:16)
+
+(cid:17)
+
+(cid:12)(cid:12)(cid:12){Φ(t)}t
+(cid:12)(cid:12)(cid:12) φ(t+1)
+
+v:
+
+j
+
+(cid:16)
+
+(cid:17)
+
+(cid:12)(cid:12)(cid:12) Φ(1), θ(1)
+(cid:17)φ
+(cid:16)
+(cid:16)
+
+c(t+1)
+j+1
+
+j
+
+φ(t+1)
+
+v:
+
+Γ
+
+t=1 P
+
+(cid:17)(cid:104)(cid:81)T−1
+(cid:17) (cid:16)
+
+(t+1)
+j
+
+θ
+
+θ(t+1)
+
+j
+
+(t+1)
+v:
+
+(cid:16)
+
+θ(t)
+j
+
+(cid:12)(cid:12)(cid:12) Φ(t+1), θ(t+1)
+(cid:17)φ(t+1)
+
+vj we have
+
+θ(t+1)
+
+−1
+
+v:
+
+j
+
+j
+
+θ(t)
+vj
+
+(cid:17)(cid:105)
+
+(cid:16)
+
+(cid:17)
+
+P
+
+θ(T )
+j
+
+.
+
+e−c(t+1)
+
+j+1 θ(t)
+vj ,
+
+(4)
+
+With φv: representing the vth row Φ, for the gamma hidden units θ(t)
+
+P
+
+θ(t)
+vj
+
+, θ(t+1)
+
+, c(t+1)
+j+1
+
+=
+
+j
+
+v
+
+v
+
+v:
+
+v:
+
+P
+
+= σ
+
+θ(t)
+
+(cid:16)
+
+(cid:17)
+
+(cid:16)
+
+(cid:17)
+
+b(t+1)
+v
+
+, b(t+1)
+
+, θ(t+1)
+
++ φ(t+1)
+
+vj = 1(cid:12)(cid:12) φ(t+1)
+
+which are highly nonlinear functions that are strongly desired in deep learning. By contrast, with the
+sigmoid function σ(x) = 1/(1 + e−x) and bias terms b(t+1)
+, a sigmoid/deep belief network would
+vj ∈ {0, 1} of layer t (for deep belief networks, t < T − 1 ) to the
+connect the binary hidden units θ(t)
+product of the connection weights and binary hidden units of the next layer with
+θ(t+1)
+j
+
+(5)
+Comparing (4) with (5) clearly shows the differences between the gamma nonnegative hidden units
+and the sigmoid link based binary hidden units. Note that the rectiﬁed linear units have emerged as
+powerful alternatives of sigmoid units to introduce nonlinearity [15]. It would be interesting to use
+the gamma units to introduce nonlinearity in the positive region of the rectiﬁed linear units.
+Deep Poisson factor analysis. With T = 1, the PGBN speciﬁed by (1)-(3) reduces to Poisson factor
+analysis (PFA) using the (truncated) gamma-negative binomial process [13], which is also related
+to latent Dirichlet allocation [16] if the Dirichlet priors are imposed on both φ(1)
+. With
+T ≥ 2, the PGBN is related to the gamma Markov chain hinted by Corollary 2 of [13] and realized
+k
+in [17], the deep exponential family of [18], and the deep PFA of [19]. Different from the PGBN,
+in [18], it is the gamma scale but not shape parameters that are chained and factorized; in [19], it is
+the correlations between binary topic usage indicators but not the full connection weights that are
+captured; and neither [18] nor [19] provide a principled way to learn the network structure. Below
+we break the PGBN of T layers into T related submodels that are solved with the same subroutine.
+
+and θ(1)
+
+.
+
+j
+
+2.1 The propagation of latent counts and model properties
+
+Lemma 1 (Augment-and-conquer the PGBN). With p(1)
+
+p(t+1)
+j
+
+:= − ln(1 − p(t)
+j )
+
+:= 1 − e−1 and
+− ln(1 − p(t)
+j )
+
+j
+
+c(t+1)
+j
+
+(cid:105)
+
+for t = 1, . . . , T , one may connect the observed (if t = 1) or some latent (if t ≥ 2) counts x(t)
+ZKt−1 to the product Φ(t)θ(t)
+
+j at layer t under the Poisson likelihood as
+
+(cid:16)
+
+(cid:17)(cid:105)
+
+j ∼ Pois
+x(t)
+
+ln
+
+1 − p(t)
+
+j
+
+.
+
+(7)
+
+(6)
+j ∈
+
+(cid:46)(cid:104)
+(cid:104)−Φ(t)θ(t)
+
+j
+
+3
+
+(cid:16)
+
+kj ln
+
+vk θ(t)
+
+(cid:16)
+(cid:104)−φ(t)
+:= x(t)·jk := (cid:80)Kt−1
+(cid:17)(cid:105)
+(cid:104)−θ(t)
+(cid:17)
+(cid:16)
+(cid:104)−φ(t+1)
+
+Φ(t+1)θ(t+1)
+
+1 − p(t)
+
+, p(t+1)
+
+ln
+
+.
+
+.
+
+j
+
+j
+
+j
+
+j
+
+v=1 φ(t)
+m(t)(t+1)
+
+j
+
+∼ Pois
+
+m(t)(t+1)
+
+j
+
+∼ NB
+
+Proof. By deﬁnition (7) is true for layer t = 1. Suppose that (7) is true for layer t ≥ 2, then we can
+augment each count x(t)
+
+vj into the summation of Kt latent counts that are smaller or equal as
+
+k=1 x(t)
+
+vjk, x(t)
+
+vjk ∼ Pois
+
+1 − p(t)
+
+j
+
+,
+
+(8)
+
+(cid:17)(cid:105)
+
+where v ∈ {1, . . . , Kt−1}. With m(t)(t+1)
+ber of times that factor k ∈ {1, . . . , Kt} of layer t appears in observation j and m(t)(t+1)
+
+vjk representing the num-
+:=
+
+v=1 x(t)
+
+kj
+
+j
+
+vk = 1, we can marginalize out Φ(t) as in [20], leading to
+
+(cid:0)x(t)·j1, . . . , x(t)·jKt
+
+(cid:1)(cid:48)
+
+x(t)
+
+vj =(cid:80)Kt
+, since(cid:80)Kt−1
+
+Further marginalizing out the gamma distributed θ(t)
+j
+
+from the above Poisson likelihood leads to
+
+(9)
+
+(cid:17)(cid:105)
+
+.
+
+(cid:16)
+
+j
+
+j
+
+j
+
+kj
+
+k:
+
+kj
+
+ln
+
+θ(t+1)
+j
+
+(cid:110)(cid:16)
+
+m(t)(t+1)
+
+), x(t+1)
+
+=(cid:80)x(t+1)
+
+The kth element of m(t)(t+1)
+
+can be augmented under its compound Poisson representation as
+1 − p(t+1)
+
+(cid:96)=1 u(cid:96), u(cid:96) ∼ Log(p(t+1)
+
+kj ∼ Pois
+Thus if (7) is true for layer t, then it is also true for layer t + 1.
+Corollary 2 (Propagate the latent counts upward). Using Lemma 4.1 of [20] on (8) and Theorem 1
+of [13] on (9), we can propagate the latent counts x(t)
+
+(cid:17)(cid:12)(cid:12)(cid:12) x(t)
+(cid:12)(cid:12)(cid:12) m(t)(t+1)
+(cid:16)
+expressed as(cid:80)
+, would often be much smaller than that of layer t, expressed as(cid:80)
+Thus the PGBN may use(cid:80)
+
+is in the same order as ln(cid:0)m(t)(t+1)
+
+(cid:1), the total count of layer t + 1,
+
+as a simple criterion to decide whether to add more layers.
+
+(cid:18)
+(cid:17) ∼ CRT
+
+As x(t)·j = m(t)(t+1)
+·j
+
+vj of layer t upward to layer t + 1 as
+
+(cid:111) ∼ Mult
+
+φ(t)
+v1 θ(t)
+k=1 φ(t)
+vk θ(t)
+m(t)(t+1)
+
+θ(t)
+φ(t)
+Ktj
+vKt
+k=1 φ(t)
+vk θ(t)
+
+x(t)
+vj1, . . . , x(t)
+
+(cid:80)Kt
+(cid:16)
+
+and x(t+1)
+
+j x(t+1)
+
+(cid:80)Kt
+
+vj , φ(t)
+
+v: , θ(t)
+
+, φ(t+1)
+
+, φ(t+1)
+
+x(t+1)
+kj
+
+, θ(t+1)
+
+θ(t+1)
+j
+
+j x(t)·j .
+
+(cid:19)
+
+x(t)
+vj ,
+
+(cid:17)
+
+, . . . ,
+
+(10)
+
+(11)
+
+vjKt
+
+·j
+
+kj
+
+kj
+
+kj
+
+kj
+
+k:
+
+k:
+
+kj
+
+kj
+
+1j
+
+.
+
+,
+
+j
+
+j
+
+j x(T )
+·j
+
+2.2 Modeling overdispersed counts
+
+j
+
+j
+
+kj
+
+. . . , θ(t)
+
+kj , p(2)
+j ),
+
+∼ NB(θ(2)
+
+kj ∼ Gam(θ(t+1)
+
+For simplicity, let us further assume c(t)
+
+In comparison to a single-layer shallow model with T = 1 that assumes the hidden units of layer
+one to be independent in the prior, the multilayer deep model with T ≥ 2 captures the correlations
+between them. Note that for the extreme case that Φ(t) = IKt for t ≥ 2 are all identity matrices,
+which indicates that there are no correlations between the features of θ(t−1)
+left to be captured, the
+deep structure could still provide beneﬁts as it helps model latent counts m(1)(2)
+that may be highly
+overdispersed. For example, supposing Φ(t) = IK2 for all t ≥ 2, then from (1) and (9) we have
+kj ∼ Gam(rk, 1/c(T +1)
+m(1)(2)
+
+(cid:3) = rk and Var(cid:2)θ(2)
+j ), Var(cid:2)m(1)(2)
+
+total variance, we have E(cid:2)θ(2)
+(cid:3) = rkp(2)
+E(cid:2)m(1)(2)
+
+).
+j = 1 for all t ≥ 3. Using the laws of total expectation and
+(cid:105)
+kj | rk
+kj | rk
+| rk
+j /(1 − p(2)
+.
+| rk ∼ NB(rk, p(2)
+j ), with a variance-to-mean ratio of 1/(1 −
+In comparison to PFA with m(1)(2)
+p(2)
+j ), the PGBN with T hidden layers, which mixes the shape of m(1)(2)
+j ) with a
+chain of gamma random variables, increases the variance-to-mean ratio of the latent count m(1)(2)
+given rk by a factor of 1 + (T − 1)p(2)
+, and hence could better model highly overdispersed counts.
+
+(cid:3) = (T − 1)rk, and hence
+(cid:1)−2(cid:104)
+(cid:3) = rkp(2)
+
+(cid:0)1 − p(2)
+
+1 + (T − 1)p(2)
+
+∼ NB(θ(2)
+
+, 1/c(t+1)
+
+. . . , θ(T )
+
+kj , p(2)
+
+| rk
+
+),
+
+kj
+
+kj
+
+kj
+
+kj
+
+kj
+
+kj
+
+j
+
+j
+
+j
+
+j
+
+j
+
+j
+
+4
+
+2.3 Upward-downward Gibbs sampling
+With Lemma 1 and Corollary 2 and the width of the ﬁrst layer being bounded by K1 max, we develop
+an upward-downward Gibbs sampler for the PGBN, each iteration of which proceeds as follows:
+Sample x(t)
+vjk for all layers using (10). But for the ﬁrst hidden layer, we may
+treat each observed count x(1)
+vj as a sequence of word tokens at the vth term (in a vocabulary of size
+V := K0) in the jth document, and assign the x(1)·j words {vji}i=1,x(1)·j
+one after another to the
+latent factors (topics), with both the topics Φ(1) and topic weights θ(1)
+
+vjk. We can sample x(t)
+
+(cid:17)
+
+j marginalized out, as
+, k ∈ {1, . . . , K1 max},
+
+(12)
+
+P (zji = k |−) ∝ η(1)+x(1)−ji
+V η(1)+x(1)−ji
+
+vji·k
+··k
+
+x(1)−ji
+·jk + φ(2)
+
+k: θ(2)
+
+j
+
+v x(t)
+
+ing index, e.g., x(t)·jk :=(cid:80)
+
+where zji is the topic index for vji and x(1)
+i δ(vji = v, zji = k) counts the number of times
+that term v appears in document j; we use the · symbol to represent summing over the correspond-
+vjk, and use x−ji to denote the count x calculated without considering
+word i in document j. The collapsed Gibbs sampling update equation shown above is related to the
+one developed in [21] for latent Dirichlet allocation, and the one developed in [22] for PFA using the
+beta-negative binomial process. When T = 1, we would replace the terms φ(2)
+j with rk for PFA
+built on the gamma-negative binomial process [13] (or with απk for the hierarchical Dirichlet pro-
+cess latent Dirichlet allocation, see [23] and [22] for details), and add an additional term to account
+for the possibility of creating an additional topic [22]. For simplicity, in this paper, we truncate the
+nonparametric Bayesian model with K1 max factors and let rk ∼ Gam(γ0/K1 max, 1/c0) if T = 1.
+Sample φ(t)
+
+k . Given these latent counts, we sample the factors/topics φ(t)
+
+k: θ(2)
+
+k as
+
+(cid:17)
+
+(cid:16)
+vjk :=(cid:80)
+
+(cid:16)
+
+j
+
+(φ(t)
+
+k |−) ∼ Dir
+(cid:16)
+(cid:16)
+:=(cid:80)Kt
+
+Sample x(t+1)
+vj
+Sample θ(t)
+
+. We sample x(t+1)
+
+using (11), replacing Φ(T +1)θ(T +1)
+
+j . Using (7) and the gamma-Poisson conjugacy, we sample θj as
+
+(θ(t)
+j
+
+|−) ∼ Gamma
+
+Φ(t+1)θ(t+1)
+
++ m(t)(t+1)
+
+j
+
+Sample r. Both γ0 and c0 are sampled using related equations in [13]. We sample r as
+
+η(t) + x(t)
+
+1·k, . . . , η(t) + x(t)
+
+Kt−1·k
+
+.
+
+(13)
+with r := (r1, . . . , rKT )(cid:48).
+
+.
+
+(14)
+
+(cid:17)(cid:105)−1(cid:17)
+
+j
+
+j
+
+j
+
+,
+
+− ln
+
+c(t+1)
+j
+
+1 − p(t)
+
+(cid:104)
+(cid:16)
+(cid:104)
+(cid:1)(cid:105)−1(cid:17)
+j ln(cid:0)1 − p(T +1)
+c0 −(cid:80)
+(cid:104)
+(cid:16)
+
+:= r·, we sample p(2)
+
+·j
+
+j
+
+j
+
+|−) ∼ Gamma
+
+e0 +θ(t)·j ,
+
+f0 +θ(t−1)
+
+·j
+
+.
+and {c(t)
+
+(15)
+(cid:105)−1(cid:17)
+j }t≥3 as
+
+, (16)
+
+(rv |−) ∼ Gam
+
+Sample c(t)
+
+j . With θ(t)·j
+
+(p(2)
+
+j
+
+|−) ∼ Beta
+
+a0 +m(1)(2)
+
+and calculate c(2)
+
+j
+
+and {p(t)
+
+,
+
+v·
+
+k=1 θ(t)
+
+γ0/KT + x(T +1)
+kj for t ≤ T and θ(T +1)
+, b0 +θ(2)·j
+j }t≥3 with (6).
+
+, (c(t)
+j
+
+(cid:17)
+
+·j
+
+(cid:16)
+
+2.4 Learning the network structure with layer-wise training
+As jointly training all layers together is often difﬁcult, existing deep networks are typically trained
+using a greedy layer-wise unsupervised training algorithm, such as the one proposed in [6] to train
+the deep belief networks. The effectiveness of this training strategy is further analyzed in [24]. By
+contrast, the PGBN has a simple Gibbs sampler to jointly train all its hidden layers, as described in
+Section 2.3, and hence does not require greedy layer-wise training. Yet the same as commonly used
+deep learning algorithms, it still needs to specify the number of layers and the width of each layer.
+In this paper, we adopt the idea of layer-wise training for the PGBN, not because of the lack of
+an effective joint-training algorithm, but for the purpose of learning the width of each hidden layer
+in a greedy layer-wise manner, given a ﬁxed budget on the width of the ﬁrst layer. The proposed
+layer-wise training strategy is summarized in Algorithm 1. With a PGBN of T − 1 layers that has
+already been trained, the key idea is to use a truncated gamma-negative binomial process [13] to
+), rk ∼
+model the latent count matrix for the newly added top layer as m(T )(T +1)
+
+∼ NB(rk, p(T +1)
+
+j
+
+kj
+
+5
+
+Sample {zji}j,i using collapsed inference; Calculate {x(1)
+for t = 2, 3, . . . , T do
+k }k ; Sample {x(t+1)
+
+Set KT−1, the inferred width of layer T − 1, as KT max, the upper bound of layer T ’s width.
+for iter = 1 : BT + CT do Upward-downward Gibbs sampling
+
+Algorithm 1 The PGBN upward-downward Gibbs sampler that uses a layer-wise training strategy to train a set
+of networks, each of which adds an additional hidden layer on top of the previously inferred network, retrains
+all its layers jointly, and prunes inactive factors from the last layer. Inputs: observed counts {xvj}v,j, upper
+bound of the width of the ﬁrst layer K1 max, upper bound of the number of layers Tmax, and hyper-parameters.
+Outputs: A total of Tmax jointly trained PGBNs with depths T = 1, T = 2, . . ., and T = Tmax.
+1: for T = 1, 2, . . . , Tmax do Jointly train all the T layers of the network
+2:
+3:
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+15:
+16:
+
+}v,j ;
+j }j,t and Calculate {p(t)
+
+end for
+Output the posterior means (according to the last MCMC sample) of all remaining factors {φ(t)
+
+k }k,t as
+k=1 as the gamma shape parameters of layer T ’s hidden units.
+
+the inferred network of T layers, and {rk}KT
+
+end for
+Sample p(2)
+for t = T, T − 1, . . . , 2 do
+
+vjk}v,j,k ; Sample {φ(t)
+and Calculate c(2)
+
+; Sample {c(t)
+
+Prune layer T ’s inactive factors {φ(T )
+k }
+
+Sample r if t = T ; Sample {θ(t)
+
+j }j ;
+
+vjk}v,k,j; Sample {x(2)
+
+vj }v,j ;
+
+, let KT =(cid:80)
+
+k:x
+
+(T )··k =0
+
+end for
+if iter = BT then
+
+end if
+
+vj
+
+j }j,t for t = 3, . . . , T + 1
+
+Sample {x(t)
+
+j
+
+j
+
+k δ(x(T )··k > 0), and update r;
+
+17: end for
+
+Gam(γ0/KT max, 1/c0), and rely on that stochastic process’s shrinkage mechanism to prune inactive
+factors (connection weight vectors) of layer T , and hence the inferred KT would be smaller than
+KT max if KT max is sufﬁciently large. The newly added layer and the layers below it would be
+jointly trained, but with the structure below the newly added layer kept unchanged. Note that when
+T = 1, the PGBN would infer the number of active factors if K1 max is set large enough, otherwise,
+it would still assign the factors with different weights rk, but may not be able to prune any of them.
+3 Experimental Results
+We apply the PGBNs for topic modeling of text corpora, each document of which is represented
+as a term-frequency count vector. Note that the PGBN with a single hidden layer is identical to
+the (truncated) gamma-negative binomial process PFA of [13], which is a nonparametric Bayesian
+algorithm that performs similarly to the hierarchical Dirichlet process latent Dirichlet allocation
+[23] for text analysis, and is considered as a strong baseline that outperforms a large number of
+topic modeling algorithms. Thus we will focus on making comparison to the PGBN with a single
+layer, with its layer width set to be large to approximate the performance of the gamma-negative
+binomial process PFA. We evaluate the PGBNs’ performance by examining both how well they
+unsupervisedly extract low-dimensional features for document classiﬁcation, and how well they
+predict heldout word tokens. Matlab code will be available in http://mingyuanzhou.github.io/.
+We use Algorithm 1 to learn, in a layer-wise manner, from the training data the weight matrices
+Φ(1), . . . , Φ(Tmax) and the top-layer hidden units’ gamma shape parameters r: to add layer T to
+a previously trained network with T − 1 layers, we use BT iterations to jointly train Φ(T ) and r
+together with {Φ(t)}1,T−1, prune the inactive factors of layer T , and continue the joint training with
+another CT iterations. We set the hyper-parameters as a0 = b0 = 0.01 and e0 = f0 = 1. Given
+the trained network, we apply the upward-downward Gibbs sampler to collect 500 MCMC samples
+after 500 burnins to estimate the posterior mean of the feature usage proportion vector θ(1)
+j /θ(1)·j at
+the ﬁrst hidden layer, for every document in both the training and testing sets.
+Feature learning for binary classiﬁcation. We consider
+the 20 newsgroups dataset
+(http://qwone.com/∼jason/20Newsgroups/) that consists of 18,774 documents from 20 different
+news groups, with a vocabulary of size K0 = 61,188. It is partitioned into a training set of 11,269
+documents and a testing set of 7,505 ones. We ﬁrst consider two binary classiﬁcation tasks that dis-
+tinguish between the comp.sys.ibm.pc.hardware and comp.sys.mac.hardware, and between the
+sci.electronics and sci.med news groups. For each binary classiﬁcation task, we remove a standard
+list of stop words and only consider the terms that appear at least ﬁve times, and report the classiﬁ-
+cation accuracies based on 12 independent random trials. With the upper bound of the ﬁrst layer’s
+
+6
+
+Figure 1: Classiﬁcation accuracy (%) as a function of the network depth T for two 20newsgroups binary
+classiﬁcation tasks, with η(t) = 0.01 for all layers. (a)-(b): the boxplots of the accuracies of 12 independent
+runs with K1 max = 800. (c)-(d): the average accuracies of these 12 runs for various K1 max and T . Note that
+K1 max = 800 is large enough to cover all active ﬁrst-layer topics (inferred to be around 500 for both binary
+classiﬁcation tasks), whereas all the ﬁrst-layer topics would be used if K1 max = 25, 50, 100, or 200.
+
+Figure 2: Classiﬁcation accuracy (%) of the PGBNs for 20newsgroups multi-class classiﬁcation (a) as a
+function of the depth T with various K1 max and (b) as a function of K1 max with various depths, with η(t) =
+0.05 for all layers. The widths of hidden layers are automatically inferred, with K1 max = 50, 100, 200, 400,
+600, or 800. Note that K1 max = 800 is large enough to cover all active ﬁrst-layer topics, whereas all the
+ﬁrst-layer topics would be used if K1 max = 50, 100, or 200.
+width set as K1 max ∈ {25, 50, 100, 200, 400, 600, 800}, and Bt = Ct = 1000 and η(t) = 0.01 for
+all t, we use Algorithm 1 to train a network with T ∈ {1, 2, . . . , 8} layers. Denote ¯θj as the esti-
+mated K1 dimensional feature vector for document j, where K1 ≤ K1 max is the inferred number of
+active factors of the ﬁrst layer that is bounded by the pre-speciﬁed truncation level K1 max. We use
+the L2 regularized logistic regression provided by the LIBLINEAR package [25] to train a linear
+classiﬁer on ¯θj in the training set and use it to classify ¯θj in the test set, where the regularization
+parameter is ﬁve-folder cross-validated on the training set from (2−10, 2−9, . . . , 215).
+As shown in Fig. 1, modifying the PGBN from a single-layer shallow network to a multi-
+layer deep one clearly improves the qualities of the unsupervisedly extracted feature vectors.
+In a random trial, with K1 max = 800, we infer a network structure of (K1, . . . , K8) =
+(512, 154, 75, 54, 47, 37, 34, 29) for the ﬁrst binary classiﬁcation task, and (K1, . . . , K8) =
+(491, 143, 74, 49, 36, 32, 28, 26) for the second one. Figs. 1(c)-(d) also show that increasing the
+network depth in general improves the performance, but the ﬁrst-layer width clearly plays an impor-
+tant role in controlling the ultimate network capacity. This insight is further illustrated below.
+Feature learning for multi-class classiﬁcation. We test the PGBNs for multi-class classiﬁcation
+on 20newsgroups. After removing a standard list of stopwords and the terms that appear less than
+ﬁve times, we obtain a vocabulary with K0 = 33, 420. We set Ct = 500 and η(t) = 0.05 for all
+t. If K1 max ≤ 400, we set Bt = 1000 for all t, otherwise we set B1 = 1000 and Bt = 500 for
+t ≥ 2. We use all 11,269 training documents to infer a set of networks with Tmax ∈ {1, . . . , 5} and
+K1 max ∈ {50, 100, 200, 400, 600, 800}, and mimic the same testing procedure used for binary clas-
+siﬁcation to extract low-dimensional feature vectors, with which each testing document is classiﬁed
+to one of the 20 news groups using the L2 regularized logistic regression. Fig. 2 shows a clear trend
+of improvement in classiﬁcation accuracy by increasing the network depth with a limited ﬁrst-layer
+width, or by increasing the upper bound of the width of the ﬁrst layer with the depth ﬁxed. For ex-
+ample, a single-layer PGBN with K1 max = 100 could add one or more layers to slightly outperform
+a single-layer PGBN with K1 max = 200, and a single-layer PGBN with K1 max = 200 could add
+layers to clearly outperform a single-layer PGBN with K1 max as large as 800. We also note that
+each iteration of jointly training multiple layers costs moderately more than that of training a single
+layer, e.g., with K1 max = 400, a training iteration on a single core of an Intel Xeon 2.7 GHz CPU
+on average takes about 5.6, 6.7, 7.1 seconds for the PGBN with 1, 3, and 5 layers, respectively.
+Examining the inferred network structure also reveals interesting details.
+ple,
+
+For exam-
+the inferred network widths (K1, . . . , K5) are
+
+in a random trial with Algorithm 1,
+
+7
+
+Number of layers T12345678Classification accuracy8282.58383.58484.58585.58686.587(a) ibm.pc.hardware vs mac.hardwareNumber of layers T12345678Classification accuracy9191.59292.59393.59494.595(b) sci.electronics vs sci.medNumber of layers T2468Classification accuracy77787980818283848586(c) ibm.pc.hardware vs mac.hardwareNumber of layers T2468Classification accuracy91.59292.59393.59494.595(d) sci.electronics vs sci.medK1max = 25K1max = 50K1max = 100K1max = 200K1max = 400K1max = 600K1max = 800Number of layers T1234567Classification accuracy717273747576777879(a)K1max = 50K1max = 100K1max = 200K1max = 400K1max = 600K1max = 800K1max100200300400500600700800Classification accuracy717273747576777879(b)T = 1T = 2T = 3T = 4T = 5Figure 3:
+(a) per-heldout-word perplexity (the lower the better) for the NIPS12 corpus (using the 2000 most
+frequent terms) as a function of the upper bound of the ﬁrst layer width K1 max and network depth T , with
+30% of the word tokens in each document used for training and η(t) = 0.05 for all t. (b) for visualization, each
+curve in (a) is reproduced by subtracting its values from the average perplexity of the single-layer network.
+
+(50, 50, 50, 50, 50), (200, 161, 130, 94, 63), (528, 129, 109, 98, 91), and (608, 100, 99, 96, 89), for
+K1 max = 50, 200, 600, and 800, respectively. This indicates that for a network with an insufﬁcient
+budget on its ﬁrst-layer width, as the network depth increases, its inferred layer widths decay more
+slowly than a network with a sufﬁcient or surplus budget on its ﬁrst-layer width; and a network with
+a surplus budget on its ﬁrst-layer width may only need relatively small widths for its higher hidden
+layers. In the Appendix, we provide comparisons of accuracies between the PGBN and other related
+algorithms, including these of [9] and [26], on similar multi-class document classiﬁcation tasks.
+Perplexities for holdout words. In addition to examining the performance of the PGBN for unsu-
+pervised feature learning, we also consider a more direct approach that we randomly choose 30% of
+the word tokens in each document as training, and use the remaining ones to calculate per-heldout-
+word perplexity. We consider the NIPS12 (http://www.cs.nyu.edu/∼roweis/data.html) corpus, lim-
+iting the vocabulary to the 2000 most frequent terms. We set η(t) = 0.05 and Ct = 500 for all t, set
+B1 = 1000 and Bt = 500 for t ≥ 2, and consider ﬁve random trials. Among the Bt + Ct Gibbs
+sampling iterations used to train layer t, we collect one sample per ﬁve iterations during the last 500
+iterations, for each of which we draw the topics {φ(1)
+, to compute the
+per-heldout-word perplexity using Equation (34) of [13]. As shown in Fig. 3, we observe a clear
+trend of improvement by increasing both K1 max and T .
+Qualitative analysis and document simulation. In addition to these quantitative experiments, we
+k to project topic k of
+layer t as a V -dimensional word probability vector. Generally speaking, the topics at lower layers
+are more speciﬁc, whereas those at higher layers are more general. E.g., examining the results used
+to produce Fig. 3, with K1 max = 200 and T = 5, the PGBN infers a network with (K1, . . . , K5) =
+(200, 164, 106, 60, 42). The ranks (by popularity) and top ﬁve words of three example topics for
+layer T = 5 are “6 network units input learning training,” “15 data model learning set image,” and
+“34 network learning model input neural;” while these of ﬁve example topics of layer T = 1 are “19
+likelihood em mixture parameters data,” “37 bayesian posterior prior log evidence,” “62 variables
+belief networks conditional inference,” “126 boltzmann binary machine energy hinton,” and “127
+
+have also examined the topics learned at each layer. We use(cid:0)(cid:81)t−1
+
+(cid:96)=1 Φ((cid:96))(cid:1)φ(t)
+
+k }k and topics weights θ(1)
+
+j
+
+j
+
+(cid:1)
+
+speech speaker acoustic vowel phonetic.” We have also tried drawing θ(T ) ∼ Gam(cid:0)r, 1/c(T +1)
+
+and downward passing it through the T -layer network to generate synthetic documents, which are
+found to be quite interpretable and reﬂect various general aspects of the corpus used to train the net-
+work. We provide in the Appendix a number of synthetic documents generated from a PGBN trained
+on the 20newsgroups corpus, whose inferred structure is (K1, . . . , K5) = (608, 100, 99, 96, 89).
+4 Conclusions
+The Poisson gamma belief network is proposed to extract a multilayer deep representation for high-
+dimensional count vectors, with an efﬁcient upward-downward Gibbs sampler to jointly train all
+its layers and a layer-wise training strategy to automatically infer the network structure. Example
+results clearly demonstrate the advantages of deep topic models. For big data problems, in practice
+one may rarely has a sufﬁcient budget to allow the ﬁrst-layer width to grow without bound, thus
+it is natural to consider a belief network that can use a deep representation to not only enhance its
+representation power, but also better allocate its computational resource. Our algorithm achieves a
+good compromise between the widths of hidden layers and the depth of the network.
+Acknowledgements. M. Zhou thanks TACC for computational support. B. Chen thanks the support
+of the Thousand Young Talent Program of China, NSC-China (61372132), and NCET-13-0945.
+
+8
+
+K1max25 100200400600800Perplexity500550600650700750(a)T = 1T = 2T = 3T = 4T = 5K1max25 100200400600800Perplexity-202468101214(b)T = 1T = 2T = 3T = 4T = 5References
+[1] Y. Bengio and Y. LeCun. Scaling learning algorithms towards AI. In L´eon Bottou, Olivier
+Chapelle, D. DeCoste, and J. Weston, editors, Large Scale Kernel Machines. MIT Press, 2007.
+[2] M Ranzato, F. J. Huang, Y.-L. Boureau, and Y. LeCun. Unsupervised learning of invariant
+
+feature hierarchies with applications to object recognition. In CVPR, 2007.
+
+[3] Y. Bengio, I. J. Goodfellow, and A. Courville. Deep Learning. Book in preparation for MIT
+
+Press, 2015.
+
+[4] R. M. Neal. Connectionist learning of belief networks. Artiﬁcial Intelligence, pages 71–113,
+
+1992.
+
+[5] L. K. Saul, T. Jaakkola, and M. I. Jordan. Mean ﬁeld theory for sigmoid belief networks.
+
+Journal of Artiﬁcial Intelligence research, pages 61–76, 1996.
+
+[6] G. Hinton, S. Osindero, and Y.-W. Teh. A fast learning algorithm for deep belief nets. Neural
+
+Computation, pages 1527–1554, 2006.
+
+[7] G. Hinton. Training products of experts by minimizing contrastive divergence. Neural compu-
+
+tation, pages 1771–1800, 2002.
+
+[8] R. Salakhutdinov and G. E. Hinton. Deep Boltzmann machines. In AISTATS, 2009.
+[9] H. Larochelle and S. Lauly. A neural autoregressive topic model. In NIPS, 2012.
+[10] R. Salakhutdinov, J. B. Tenenbaum, and A. Torralba. Learning with hierarchical-deep models.
+
+IEEE Trans. Pattern Anal. Mach. Intell., pages 1958–1971, 2013.
+
+[11] M. Welling, M. Rosen-Zvi, and G. E. Hinton. Exponential family harmoniums with an appli-
+
+cation to information retrieval. In NIPS, pages 1481–1488, 2004.
+
+[12] E. P. Xing, R. Yan, and A. G. Hauptmann. Mining associated text and images with dual-wing
+
+harmoniums. In UAI, 2005.
+
+[13] M. Zhou and L. Carin. Negative binomial process count and mixture modeling. IEEE Trans.
+
+Pattern Anal. Mach. Intell., 2015.
+
+[14] M. Zhou, O. H. M. Padilla, and J. G. Scott. Priors for random count matrices derived from a
+
+family of negative binomial processes. to appear in J. Amer. Statist. Assoc., 2015.
+
+[15] V. Nair and G. E. Hinton. Rectiﬁed linear units improve restricted Boltzmann machines. In
+
+ICML, 2010.
+
+[16] D. Blei, A. Ng, and M. Jordan. Latent Dirichlet allocation. J. Mach. Learn. Res., 2003.
+[17] A. Acharya, J. Ghosh, and M. Zhou. Nonparametric Bayesian factor analysis for dynamic
+
+count matrices. In AISTATS, 2015.
+
+[18] R. Ranganath, L. Tang, L. Charlin, and D. M. Blei. Deep exponential families. In AISTATS,
+
+2015.
+
+[19] Z. Gan, C. Chen, R. Henao, D. Carlson, and L. Carin. Scalable deep poisson factor analysis
+
+for topic modeling. In ICML, 2015.
+
+[20] M. Zhou, L. Hannah, D. Dunson, and L. Carin. Beta-negative binomial process and Poisson
+
+factor analysis. In AISTATS, 2012.
+
+[21] T. L. Grifﬁths and M. Steyvers. Finding scientiﬁc topics. PNAS, 2004.
+[22] M. Zhou. Beta-negative binomial process and exchangeable random partitions for mixed-
+
+membership modeling. In NIPS, 2014.
+
+[23] Y. W. Teh, M. I. Jordan, M. J. Beal, and D. M. Blei. Hierarchical Dirichlet processes. J. Amer.
+
+Statist. Assoc., 2006.
+
+[24] Y. Bengio, P. Lamblin, D. Popovici, and H. Larochelle. Greedy layer-wise training of deep
+
+networks. In NIPS, 2007.
+
+[25] R.-E. Fan, K.-W. Chang, C.-J. Hsieh, X.-R. Wang, and C.-J. Lin. LIBLINEAR: A library for
+
+large linear classiﬁcation. JMLR, pages 1871–1874, 2008.
+
+[26] N. Srivastava, R. Salakhutdinov, and G. Hinton. Modeling documents with a deep Boltzmann
+
+machine. In UAI, 2013.
+
+9
+
+

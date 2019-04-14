@@ -1,0 +1,666 @@
+Dependent Multinomial Models Made Easy:
+
+Stick Breaking with the P´olya-Gamma Augmentation
+
+Scott W. Linderman∗
+Harvard University
+
+Cambridge, MA 02138
+
+swl@seas.harvard.edu
+
+Matthew J. Johnson∗
+Harvard University
+
+Cambridge, MA 02138
+
+mattjj@csail.mit.edu
+
+Ryan P. Adams
+
+rpa@seas.harvard.edu
+
+Twitter & Harvard University
+
+Cambridge, MA 02138
+
+Abstract
+
+Many practical modeling problems involve discrete data that are best represented
+as draws from multinomial or categorical distributions. For example, nucleotides
+in a DNA sequence, children’s names in a given state and year, and text documents
+are all commonly modeled with multinomial distributions. In all of these cases,
+we expect some form of dependency between the draws: the nucleotide at one
+position in the DNA strand may depend on the preceding nucleotides, children’s
+names are highly correlated from year to year, and topics in text may be corre-
+lated and dynamic. These dependencies are not naturally captured by the typical
+Dirichlet-multinomial formulation. Here, we leverage a logistic stick-breaking
+representation and recent innovations in P´olya-gamma augmentation to reformu-
+late the multinomial distribution in terms of latent variables with jointly Gaussian
+likelihoods, enabling us to take advantage of a host of Bayesian inference tech-
+niques for Gaussian models with minimal overhead.
+
+1
+
+Introduction
+
+It is often desirable to model discrete data in terms of continuous latent structure. In applications in-
+volving text corpora, discrete-valued time series, or polling and purchasing decisions, we may want
+to learn correlations or spatiotemporal dynamics and leverage these structures to improve inferences
+and predictions. However, adding these continuous latent dependence structures often comes at the
+cost of signiﬁcantly complicating inference: such models may require specialized, one-off inference
+algorithms, such as a non-conjugate variational optimization, or they may only admit very general
+inference tools like particle MCMC [1] or elliptical slice sampling [2], which can be inefﬁcient and
+difﬁcult to scale. Developing, extending, and applying these models has remained a challenge.
+In this paper we aim to provide a class of such models that are easy and efﬁcient. We develop models
+for categorical and multinomial data in which dependencies among the multinomial parameters are
+modeled via latent Gaussian distributions or Gaussian processes, and we show that this ﬂexible class
+of models admits a simple auxiliary variable method that makes inference easy, fast, and modular.
+This construction not only makes these models simple to develop and apply, but also allows the
+resulting inference methods to use off-the-shelf algorithms and software for Gaussian processes and
+linear Gaussian dynamical systems.
+The paper is organized as follows. After providing background material and deﬁning our general
+models and inference methods, we demonstrate the utility of this class of models by applying it to
+three domains as case studies. First, we develop a correlated topic model for text corpora. Second,
+we study an application to modeling the spatial and temporal patterns in birth names given only
+sparse data. Finally, we provide a new continuous state-space model for discrete-valued sequences,
+
+∗These authors contributed equally.
+
+1
+
+including text and human DNA. In each case, given our model construction and auxiliary variable
+method, inference algorithms are easy to develop and very effective in experiments.
+Code to use these models, write new models that leverage these inference methods, and reproduce
+the ﬁgures in this paper is available at github.com/HIPS/pgmult.
+
+2 Modeling correlations in multinomial parameters
+
+In this section, we discuss an auxiliary variable scheme that allows multinomial observations to
+appear as Gaussian likelihoods within a larger probabilistic model. The key trick discussed in the
+proceeding sections is to introduce P´olya-gamma random variables into the joint distribution over
+data and parameters in such a way that the resulting marginal leaves the original model intact.
+The integral identity underlying the P´olya-gamma augmentation scheme [3] is
+
+(eψ)a
+
+(1 + eψ)b = 2−beκψ
+
+(1)
+where κ = a − b/2 and p(ω | b, 0) is the density of the P´olya-gamma distribution PG(b, 0), which
+does not depend on ψ. Consider a likelihood function of the form
+
+0
+
+e−ωψ2/2p(ω | b, 0) dω,
+
+(cid:90) ∞
+
+p(x| ψ) = c(x)
+
+(eψ)a(x)
+
+(1 + eψ)b(x)
+
+(2)
+
+(cid:90) ∞
+
+0
+
+for some functions a, b, and c. Such likelihoods arise, e.g., in logistic regression and in binomial and
+negative binomial regression [3]. Using (1) along with a prior p(ψ), we can write the joint density
+of (ψ, x) as
+
+p(ψ, x) = p(ψ) c(x)
+
+(eψ)a(x)
+
+(1 + eψ)b(x)
+
+=
+
+p(ψ) c(x) 2−b(x)eκ(x)ψe−ωψ2/2p(ω | b(x), 0) dω.
+
+(3)
+
+The integrand of (3) deﬁnes a joint density on (ψ, x, ω) which admits p(ψ, x) as a marginal density.
+Conditioned on these auxiliary variables ω, we have
+
+p(ψ | x, ω) ∝ p(ψ)eκ(x)ψe−ωψ2/2
+
+(4)
+which is Gaussian when p(ψ) is Gaussian. Furthermore, by the exponential tilting property of the
+P´olya-gamma distribution, we have ω | ψ, x ∼ PG(b(x), ψ). Thus the identity (1) gives rise to a
+conditionally conjugate augmentation scheme for Gaussian priors and likelihoods of the form (2).
+This augmentation scheme has been used to develop Gibbs sampling and variational inference al-
+gorithms for Bernoulli, binomial [3], and negative binomial [4] regression models with logit link
+functions, and to the multinomial distribution with a multi-class logistic link function [3, 5].
+The multi-class logistic “softmax” function, πLN(ψ), maps a real-valued vector ψ ∈ RK to a proba-
+j=1 eψj . It is commonly used in multi-class regres-
+sion [6] and correlated topic modeling [7]. Correlated multinomial parameters can be modeled with
+a Gaussian prior on the vector ψ, though the resulting models are not conjugate. The P´olya-gamma
+augmentation can be applied to such models [3, 5], but it only provides single-site Gibbs updating
+of ψ. This paper develops a joint augmentation in the sense that, given the auxiliary variables, the
+entire vector ψ is resampled as a block in a single Gibbs update.
+
+bility vector π ∈ [0, 1]K by setting πk = eψk /(cid:80)K
+
+2.1 A new P´olya-gamma augmentation for the multinomial distribution
+First, rewrite the K-dimensional multinomial recursively in terms of K − 1 binomial densities:
+
+K−1(cid:89)
+1 −(cid:80)
+
+k=1
+
+2
+
+Mult(x| N, π) =
+
+Nk = N −(cid:88)
+
+xj,
+
+j<k
+
+(cid:101)πk =
+
+Bin(xk | Nk,(cid:101)πk),
+
+πk
+j<k πj
+
+,
+
+k = 2, 3, . . . , K,
+
+(5)
+
+(6)
+
+Figure 1: Correlated 2D Gaussian priors on ψ and their implied densities on πSB(ψ). See text for details.
+
+This decomposition of the multinomial density is a “stick-breaking” representation where
+
+where N1 = N =(cid:80)
+k xk and (cid:101)π1 = π1. For convenience, we deﬁne N (x) ≡ [N1, . . . , NK−1].
+each (cid:101)πk represents the fraction of the remaining probability mass assigned to the k-th com-
+ponent. We let (cid:101)πk = σ(ψk), where σ(·) denotes the logistic function, and deﬁne the func-
+Next, we rewrite the density into the form required by (1) by substituting σ(ψk) for(cid:101)πk:
+
+tion, πSB : RK−1 → [0, 1]K, which maps a vector ψ to a normalized probability vector π.
+
+Mult(x| N, ψ) =
+
+K−1(cid:89)
+
+k=1
+
+Bin(xk | Nk, σ(ψk)) =
+
+=
+
+σ(ψk)xk (1 − σ(ψk))Nk−xk
+
+K−1(cid:89)
+K−1(cid:89)
+
+k=1
+
+(cid:18)Nk
+(cid:18)Nk
+
+xk
+
+(cid:19)
+(cid:19) (eψk )xk
+
+xk
+
+(1 + eψk )Nk
+
+k=1
+
+.
+
+(7)
+
+(8)
+
+Choosing ak(x) = xk and bk(x) = Nk for each k = 1, 2, . . . , K − 1, we can then introduce P´olya-
+gamma auxiliary variables ωk corresponding to each coordinate ψk; dropping terms that do not
+depend on ψ and completing the square yields
+
+e(xk−Nk/2)ψk−ωkψ2
+
+k/2 ∝ N
+
+Ω−1κ(x)
+
+,
+
+(9)
+
+(cid:18)
+
+(cid:19)
+
+(cid:12)(cid:12)(cid:12)(cid:12) ψ, Ω−1
+
+p(x, ω | ψ) ∝ K−1(cid:89)
+
+k=1
+
+where Ω ≡ diag(ω) and κ(x) ≡ x − N (x)/2. That is, conditioned on ω, the likelihood of ψ under
+the augmented multinomial model is proportional to a diagonal Gaussian distribution.
+Figure 1 shows how several Gaussian densities map to probability densities on the simplex. Cor-
+related Gaussians (left) put most probability mass near the π1 = π2 axis of the simplex, and anti-
+correlated Gaussians (center) put mass along the sides where π1 is large when π2 is small and
+vice-versa. Finally, a nearly isotropic Gaussian approximates a symmetric Dirichlet. Appendix A
+gives a closed-form expression for the density on π induced by a Gaussian distribution on ψ, and
+also an expression for a diagonal Gaussian that approximates a Dirichlet by matching moments.
+
+3 Correlated topic models
+
+The Latent Dirichlet Allocation (LDA) [8] is a popular model for learning topics from text corpora.
+The Correlated Topic Model (CTM) [7] extends LDA by including a Gaussian correlation structure
+among topics. This correlation model is powerful not only because it reveals correlations among
+
+3
+
+Figure 2: A comparison of correlated topic model performance. The left panel shows a subset of the inferred
+topic correlations for the AP News corpus. Two examples are highlighted: a) positive correlation between topics
+(house, committee, congress, law) and (Bush, Dukakis, president, campaign), and b) anticorrelation between
+(percent, year, billion, rate) and (court, case, attorney, judge). The middle and right panels demonstrate the
+efﬁcacy of our SB-CTM relative to competing models on the AP News corpus and the 20 Newsgroup corpus,
+respectively.
+
+topics but also because inferring such correlations can signiﬁcantly improve predictions, especially
+when inferring the remaining words in a document after only a few have been revealed [7]. How-
+ever, the addition of this Gaussian correlation structure breaks the Dirichlet-Multinomial conjugacy
+of LDA, making estimation and particularly Bayesian inference and model-averaged predictions
+more challenging. An approximate maximum likelihood approach using variational EM [7] is often
+effective, but a fully Bayesian approach which integrates out parameters may be preferable, espe-
+cially when making predictions based on a small number of revealed words in a document. A recent
+Bayesian approach based on a P´olya-Gamma augmentation to the logistic normal CTM (LN-CTM)
+[5] provides a Gibbs sampling algorithm with conjugate updates, but the Gibbs updates are limited
+to single-site resampling of one scalar at a time, which can lead to slow mixing in correlated models.
+In this section we show that MCMC sampling in a correlated topic model based on the stick breaking
+construction (SB-CTM) can be signiﬁcantly more efﬁcient than sampling in the LN-CTM while
+maintaining the same integration advantage over EM.
+In the standard LDA model, each topic βt (t = 1, 2, . . . , T ) is a distribution over a vocabulary
+of V possible words, and each document d has a distribution over topics θd (d = 1, 2, . . . , D).
+The n-th word in document d is denoted wn,d for d = 1, 2, . . . , Nd. When each βt and θd is given
+a symmetric Dirichlet prior with parameters αβ and αθ, respectively, the generative model is
+βt ∼ Dir(αβ),
+zn,d | θd ∼ Cat(θd), wn,d | zn,d,{βt} ∼ Cat(βzn,d
+). (10)
+The CTM replaces the Dirichlet prior on each θd with a correlated prior induced by ﬁrst
+sampling a correlated Gaussian vector ψd ∼ N (µ, Σ) and then applying the logistic normal
+map: θd = πLN(ψd) Analogously, our SB-CTM generates the correlation structure by instead ap-
+plying the stick-breaking logistic map, θd = πSB(ψd). The goal is then to infer the posterior dis-
+tribution over the topics βt, the documents’ topic allocations ψd, and their mean and correlation
+structure (µ, Σ), where the parameters (µ, Σ) are given a conjugate normal-inverse Wishart (NIW)
+prior. Modeling correlation structure within the topics β can be done analogously.
+For fully Bayesian inference in the SB-CTM, we develop a Gibbs sampler that exploits the block
+conditional Gaussian structure provided by the stick-breaking construction. The Gibbs sampler
+iteratively samples z | w, β, ψ; β | z, w; ψ | z, µ, Σ, ω;
+and µ, Σ| ψ as well as the auxiliary
+variables ω | ψ, z. The ﬁrst two are standard updates for LDA models, so we focus on the latter
+three. Using the identities derived in Section 2.1, the conditional density of each ψd | zd, µ, Σ, ω
+can be written
+
+θd ∼ Dir(αθ),
+
+p(ψd | zd, ωd) ∝ N (Ω−1
+
+d κ(cd)| ψd, Ω−1
+
+d ) N (ψd | µ, Σ) ∝ N (ψd |(cid:101)µ,(cid:101)Σ),
+
+(11)
+
+4
+
+where we have deﬁned
+
+(cid:101)µ = (cid:101)Σ(cid:2)κ(cd) + Σ−1µ(cid:3) ,
+
+(cid:101)Σ =(cid:2)Ωd + Σ−1(cid:3)−1
+
+,
+
+cd,t =
+
+(cid:88)
+
+n
+
+I[zn,d = t], Ωd = diag(ωd),
+
+and so it is resampled as a joint Gaussian. The correlation structure parameters µ and Σ are sampled
+from their conditional NIW distribution. Finally, the auxiliary variables ω are sampled as P´olya-
+Gamma random variables, with ωd | zd, ψd ∼ PG(N (cd), ψd). A feature of the stick-breaking
+construction is that the the auxiliary variable update is embarrassingly parallel.
+We compare the performance of this Gibbs sampling algorithm for the SB-CTM to the Gibbs sam-
+pling algorithm of the LN-CTM [5], which uses a different P´olya-gamma augmentation, as well as
+the original variational EM algorithm for the CTM and collapsed Gibbs sampling in standard LDA.
+Figure 2 shows results on both the AP News dataset and the 20 Newsgroups dataset, where models
+were trained on a random subset of 95% of the complete documents and tested on the remaining 5%
+by estimating held-out likelihoods of half the words given the other half. The collapsed Gibbs sam-
+pler for LDA is fast but because it does not model correlations its ability to predict is signiﬁcantly
+constrained. The variational EM algorithm for the CTM is reasonably fast but its point estimate
+doesn’t quite match the performance from integrating out parameters via MCMC in this setting.
+The LN-CTM Gibbs sampler continues to improve slowly but is limited by its single-site updates,
+while the SB-CTM sampler seems to both mix effectively and execute efﬁciently due to its block
+Gaussian updating.
+The SB-CTM demonstrates that the stick-breaking construction and corresponding P´olya-Gamma
+augmentation makes inference in correlated topic models both easy to implement and computa-
+tionally efﬁcient. The block conditional Gaussianity also makes inference algorithms modular and
+compositional: the construction immediately extends to dynamic topic models (DTMs) [9], in which
+the latent ψd evolve according to linear Gaussian dynamics, and inference can be implemented sim-
+ply by applying off-the-shelf code for Gaussian linear dynamical systems (see Section 5). Finally,
+because LDA is so commonly used as a component of other models (e.g. for images [10]), easy,
+effective, modular inference for CTMs and DTMs is a promising general tool.
+
+4 Gaussian processes with multinomial observations
+
+Consider the United States census data, which lists the ﬁrst names of children born in each state for
+the years 1910-2013. Suppose we wish to predict the probability of a particular name in New York
+State in the years 2012 and 2013 given observed names in earlier years. We might reasonably expect
+that name probabilities vary smoothly over time as names rise and fall in popularity, and that name
+probability would be similar in neighboring states. A Gaussian process naturally captures these
+prior intuitions about spatiotemporal correlations, but the observed name counts are most naturally
+modeled as multinomial draws from latent probability distributions over names for each combination
+of state and year. We show how efﬁcient inference can be performed in this otherwise difﬁcult model
+by leveraging the P´olya-gamma augmentation.
+Let Z ∈ RM×D denote the matrix of D dimensional inputs and X ∈ NM×K denote the observed K
+dimensional count vectors for each input. In our example, each row zm of Z corresponds to the
+year, latitude, and longitude of an observation, and K is the number of names. Underlying these
+observations we introduce a set of latent variables, ψm,k such that the probability vector at input zm
+is πm = πSB(ψm,:). The auxiliary variables for the k-th name, ψ:,k, are linked via a Gaussian
+process with covariance matrix, C, whose entry Ci,j is the covariance between input zi and zj
+under the GP prior, and mean vector µk. The covariance matrix is shared by all names, and the
+mean is empirically set to match the measured name probability. The full model is then,
+
+xm ∼ Mult(Nm, πSB(ψm,:)).
+
+ψ:,k ∼ GP(µk, C),
+(cid:18)
+
+(cid:101)Σk =(cid:0)C−1 + Ωk
+
+(cid:1)−1
+
+To perform inference, introduce auxiliary P´olya-gamma variables, ωm,k for each ψm,k. Conditioned
+on these variables, the conditional distribution of ψ:,k is,
+p(ψ:,k | Z, X, ω, µ, C) ∝ N
+
+ψ:,k |(cid:101)µk,(cid:101)Σk
+
+Ω−1
+k κ(X :,k)
+
+(cid:17)
+
+(cid:12)(cid:12)(cid:12)(cid:12) ψ:,k, Ω−1
+(cid:101)µk = (cid:101)Σk
+
+k
+
+(cid:19)
+N (ψ:,k | µk, C) ∝ N(cid:16)
+(cid:0)κ(X :,k) + C−1µk
+(cid:1) ,
+
+5
+
+2012
+
+2013
+
+Model
+
+Static 2011
+Raw GP
+LNM GP
+SBM GP
+
+Top 10
+4.2 (1.3)
+4.9 (1.1)
+6.7 (1.4)
+7.3 (1.0)
+
+Bot. 10
+0.7 (1.2)
+0.7 (0.9)
+4.8 (1.7)
+4.0 (1.8)
+
+Top 10
+4.2 (1.4)
+5.0 (1.0)
+6.8 (1.4)
+7.0 (1.0)
+
+Bot. 10
+0.8 (1.0)
+0.8 (0.9)
+4.6 (1.7)
+3.9 (1.4)
+
+Average number of names correctly predicted
+
+Figure 3: A spatiotemporal Gaussian process applied to the names of children born in the United States from
+1960-2013. With a limited dataset of only 50 observations per state/year, the stick breaking and logistic normal
+multinomial GPs (SBM GP and LNM GP) outperform na¨ıve approaches in predicting the top and bottom 10
+names (bottom left, parentheses: std. error). Our SBM GP, which leverages the P´olya-gamma augmentation, is
+considerably more efﬁcient than the non-conjugate LNM GP (bottom right).
+
+tion: ωm,k | xm, ψm,k ∼ PG(Nm,k, ψm,k), where Nm,k = Nm −(cid:80)
+
+where Ωk = diag(ω:,k). The auxiliary variables are updated according to their conditional distribu-
+
+j<k xm,j.
+
+Figure 3 illustrates the power of this approach on U.S. census data. The top two plots show the
+inferred probabilities under our stick-breaking multinomial GP model for the full dataset. Interest-
+ing spatiotemporal correlations in name probability are uncovered. In this large-count regime, the
+posterior uncertainty is negligible since we observe thousands of names per state and year, and sim-
+ply modeling the transformed empirical probabilities with a GP works well. However, in the sparse
+data regime with only Nm = 50 observations per input, it greatly improves performance to model
+uncertainty in the latent probabilities using a Gaussian process with multinomial observations.
+The bottom panels compare four methods of predicting future names in the years 2012 and 2013
+for a down-sampled dataset with Nm = 50: predicting based on the empirical probability measured
+in 2011; a standard GP to the empirical probabilities transformed by π−1
+SB (Raw GP); a GP whose
+outputs are transformed by the logistic normal function, πLN, to obtain multinomial probabilities
+(LNM GP) ﬁt using elliptical slice sampling [2]; and our stick-breaking multinomial GP (SBM
+GP). In terms of ability to predict the top and bottom 10 names, the multinomial models are both
+comparable and vastly superior to the naive approaches.
+The SBM GP model is considerably faster than the logistic normal version, as shown in the bottom
+right panel. The augmented Gibbs sampler is more efﬁcient than the elliptical slice sampling algo-
+rithm used to handle the non-conjugacy in the LNM GP. Moreover, we are able to make collapsed
+predictions in which we compute the predictive distribution test ψ’s given ω, integrating out the
+training ψ. In contrast, the LNM GP must condition on the training GP values in order to make pre-
+dictions, and effectively integrate over training samples using MCMC. Appendix B goes into greater
+detail on how marginal predictions are computed and why they are more efﬁcient than predicting
+conditioned on a single value of ψ.
+
+6
+
+Figure 4: Predictive log likelihood comparison of time series models with multinomial observations.
+
+5 Multinomial linear dynamical systems
+
+While discrete-state hidden Markov models (HMMs) are ubiquitous for modeling time series and
+sequence data, it can be preferable to use a continuous state space model.
+In particular, while
+discrete states have no intrinsic geometry, continuous states can correspond to natural Euclidean
+embeddings [11]. These considerations are particularly relevant to text, where word embeddings
+[12] have proven to be a powerful tool.
+Gaussian linear dynamical systems (LDS) provide very efﬁcient learning and inference algorithms,
+but they can typically only be applied when the observations are themselves linear with Gaussian
+noise. While it is possible to apply a Gaussian LDS to count vectors [11], the resulting model is
+misspeciﬁed in the sense that, as a continuous density, the model assigns zero probability to training
+and test data. However, Belanger and Kakade [11] show that this model can still be used for several
+machine learning tasks with compelling performance, and that the efﬁcient algorithms afforded by
+the misspeciﬁed Gaussian assumptions confer a signiﬁcant computational advantage. Indeed, the au-
+thors have observed that such a Gaussian model is “worth exploring, since multinomial models with
+softmax link functions prevent closed-form M step updates and require expensive” computations
+[13]; this paper aims to bridge precisely this gap and enable efﬁcient Gaussian LDS computational
+methods to be applied while maintaining multinomial emissions and an asymptotically unbiased
+representation of the posterior. While there are other approximation schemes that effectively extend
+some of the beneﬁts of LDSs to nonlinear, non-Gaussian settings, such as the extended Kalman ﬁlter
+(EKF) and unscented Kalman ﬁlter (UKF) [14, 15], these methods do not allow for asymptotically
+unbiased Bayesian inference, can have complex behavior, and can make model learning a challenge.
+Alternatively, particle MCMC (pMCMC) [1] is a very powerful algorithm that provides unbiased
+Bayesian inference for very general state space models, but it does not enjoy the efﬁcient block
+updates or conjugacy of LDSs or HMMs.
+The stick-breaking multinomial linear dynamical system (SBM-LDS) generates states via a linear
+Gaussian dynamical system but generates multinomial observations via the stick-breaking map:
+z0|µ0, Σ0 ∼ N (µ0, Σ0),
+zt|zt−1, A, B ∼ N (Azt−1, B), xt|zt, C ∼ Mult(Nt, πSB(Czt)),
+where zt ∈ RD is the system state at time t and xt ∈ NK are the multinomial observations.
+We suppress notation for conditioning on A, B, C, µ0, and Σ0, which are system parameters of
+appropriate sizes that are given conjugate priors. The logistic normal multinomial LDS (LNM-LDS)
+is deﬁned analogously but uses πLN in place of πSB.
+To produce a Gibbs sampler with fully conjugate updates, we augment the observations with
+P´olya-gamma random variables ωt,k. As a result, the conditional state sequence z1:T|ω1:T , x1:T
+is jointly distributed according to a Gaussian LDS in which the diagonal observation potential at
+time t is N (Ω−1
+t ). Thus the state sequence can be jointly sampled using off-
+
+t κ(xt)|Czt, Ω−1
+
+7
+
+the-shelf LDS software, and the system parameters can similarly be updated using standard al-
+gorithms. The only remaining update is to the auxiliary variables, which are sampled according to
+ωt|zt, C, x ∼ PG(N (xt), Czt).
+We compare the SBM-LDS and the Gibbs sampling inference algorithm to three baseline methods:
+an LNM-LDS using pMCMC and ancestor resampling [16] for inference, an HMM using Gibbs
+sampling, and a “raw” LDS which treats the multinomial observation vectors as observations in
+RK as in [11]. We examine each method’s performance on each of three experiments: in modeling
+a sequence of 682 amino acids from human DNA with 22 dimensional observations, a set of 20
+random AP news articles with an average of 77 words per article and a vocabulary size of 200
+words, and an excerpt of 4000 words from Lewis Carroll’s Alice’s Adventures in Wonderland with
+a vocabulary of 1000 words. We reserved the ﬁnal 10 amino acids, 10 words per news article, and
+100 words from Alice for computing predictive likelihoods. Each linear dynamical model had a 10-
+dimensional state space, while the HMM had 10 discrete states (HMMs with 20, 30, and 40 states
+all performed worse on these tasks).
+Figure 4 (left panels) shows the predictive log likelihood for each method on each experiment, nor-
+malized by the number of counts in the test dataset and relative to the likelihood under a multinomial
+model ﬁt to the training data mean. For the DNA data, which has the smallest “vocabulary” size, the
+HMM achieves the highest predictive likelihood, but the SBM-LDS edges out the other LDS meth-
+ods. On the two text datasets, the SBM-LDS outperforms the other methods, particularly in Alice
+where the vocabulary is larger and the document is longer. In terms of run time, the SBM-LDS is
+orders of magnitude faster than the LNM-LDS with pMCMC (right panel) because it mixes much
+more efﬁciently over the latent trajectories.
+
+6 Related Work
+
+The stick-breaking transformation used herein was applied to categorical models by Khan et al. [17],
+but they used local variational bound instead of the P´olya-gamma augmentation. Their promising
+results corroborate our ﬁndings of improved performance using this transformation. Their general-
+ized expectation-maximization algorithm is not fully Bayesian, and does not integrate into existing
+Gaussian modeling and inference code as easily as our augmentation.
+Conversely, Chen et al. [5] used the P´olya-gamma augmentation in conjunction with the logistic
+normal transformation for correlated topic modeling, exploiting the conditional conjugacy of a single
+entry ψk | ωk, ψ¬k with a Gaussian prior. Unlike our stick-breaking transformation, which admits
+block Gibbs sampling over the entire vector ψ simultaneously, their approach is limited to single-
+site Gibbs sampling. As shown in our correlated topic model experiments, this has dramatic effects
+on inferential performance. Moreover, it precludes analytical marginalization and integration with
+existing Gaussian modeling algorithms. For example, it is not immediately applicable to inference
+in linear dynamical systems with multinomial observations.
+
+7 Conclusion
+
+These case studies demonstrate that the stick-breaking multinomial model construction paired with
+the P´olya-gamma augmentation yields a ﬂexible class of models with easy, efﬁcient, and compo-
+sitional inference. In addition to making these models easy, the methods developed here can also
+enable new models for multinomial and mixed data: the latent continuous structures used here to
+model correlations and state-space structure can be leveraged to explore new models for interpretable
+feature embeddings, interacting time series, and dependence with other covariates.
+
+8 Acknowledgements
+
+S.W.L. is supported by a Siebel Scholarship and the Center for Brains, Minds and Machines
+(CBMM), funded by NSF STC award CCF-1231216. M.J.J. is supported by the Harvard/MIT Joint
+Research Grants Program. R.P.A. is supported by NSF IIS-1421780 as well as the Alfred P. Sloan
+Foundation.
+
+8
+
+References
+[1] Christophe Andrieu, Arnaud Doucet, and Roman Holenstein. Particle Markov chain Monte
+Carlo methods. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 72
+(3):269–342, 2010.
+
+[2] Iain Murray, Ryan P. Adams, and David J.C. MacKay. Elliptical slice sampling. Journal of
+Machine Learning Research: Workshop and Conference Proceedings (AISTATS), 9:541–548,
+05/2010 2010.
+
+[3] Nicholas G Polson, James G Scott, and Jesse Windle. Bayesian inference for logistic models
+using P´olya–gamma latent variables. Journal of the American Statistical Association, 108
+(504):1339–1349, 2013.
+
+[4] Mingyuan Zhou, Lingbo Li, David Dunson, and Lawrence Carin. Lognormal and gamma
+mixed negative binomial regression. In Proceedings of the International Conference on Ma-
+chine Learning, volume 2012, page 1343, 2012.
+
+[5] Jianfei Chen, Jun Zhu, Zi Wang, Xun Zheng, and Bo Zhang. Scalable inference for logistic-
+normal topic models. In Advances in Neural Information Processing Systems, pages 2445–
+2453, 2013.
+
+[6] Chris C Holmes, Leonhard Held, et al. Bayesian auxiliary variable models for binary and
+
+multinomial regression. Bayesian Analysis, 1(1):145–168, 2006.
+
+[7] David Blei and John Lafferty. Correlated topic models. Advances in Neural Information
+
+Processing Systems, 18:147, 2006.
+
+[8] David M Blei, Andrew Y Ng, and Michael I Jordan. Latent Dirichlet allocation. the Journal
+
+of machine Learning research, 3:993–1022, 2003.
+
+[9] David M Blei and John D Lafferty. Dynamic topic models. In Proceedings of the International
+
+Conference on Machine Learning, pages 113–120. ACM, 2006.
+
+[10] Xiaogang Wang and Eric Grimson. Spatial latent Dirichlet allocation. In Advances in Neural
+
+Information Processing Systems, pages 1577–1584, 2008.
+
+[11] David Belanger and Sham Kakade. A linear dynamical system model for text. In Proceedings
+
+of the International Conference on Machine Learning, 2015.
+
+[12] Ronan Collobert and Jason Weston. A uniﬁed architecture for natural language processing:
+Deep neural networks with multitask learning. In Proceedings of the International Conference
+on Machine Learning, pages 160–167. ACM, 2008.
+
+[13] David Belanger and Sham Kakade. Embedding word tokens using a linear dynamical system.
+
+In NIPS 2014 Modern ML+NLP Workshop, 2014.
+
+[14] Eric A Wan and Rudolph Van Der Merwe. The unscented Kalman ﬁlter for nonlinear estima-
+tion. In Adaptive Systems for Signal Processing, Communications, and Control Symposium
+2000. AS-SPCC. The IEEE 2000, pages 153–158. IEEE, 2000.
+
+[15] Sebastian Thrun, Wolfram Burgard, and Dieter Fox. Probabilistic robotics. MIT press, 2005.
+
+[16] Fredrik Lindsten, Thomas Sch¨on, and Michael I Jordan. Ancestor sampling for particle Gibbs.
+
+In Advances in Neural Information Processing Systems, pages 2591–2599, 2012.
+
+[17] Mohammad E Khan, Shakir Mohamed, Benjamin M Marlin, and Kevin P Murphy. A stick-
+breaking likelihood for categorical data analysis with latent Gaussian models. In International
+Conference on Artiﬁcial Intelligence and Statistics, pages 610–618, 2012.
+
+9
+
+

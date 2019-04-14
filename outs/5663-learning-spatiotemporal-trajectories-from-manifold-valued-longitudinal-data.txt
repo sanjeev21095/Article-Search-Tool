@@ -1,0 +1,784 @@
+Learning spatiotemporal trajectories from
+
+manifold-valued longitudinal data
+
+Jean-Baptiste Schiratti2,1, St´ephanie Allassonni`ere2, Olivier Colliot1, Stanley Durrleman1
+
+1 ARAMIS Lab, INRIA Paris, Inserm U1127, CNRS UMR 7225, Sorbonne Universit´es,
+
+UPMC Univ Paris 06 UMR S 1127, Institut du Cerveau et de la Moelle ´epini`ere,
+
+ICM, F-75013, Paris, France
+
+2CMAP, Ecole Polytechnique, Palaiseau, France
+
+jean-baptiste.schiratti@cmap.polytechnique.fr,
+
+stephanie.allassonniere@polytechnique.edu,
+
+olivier.colliot@upmc.fr,stanley.durrleman@inria.fr
+
+Abstract
+
+We propose a Bayesian mixed-effects model to learn typical scenarios of changes
+from longitudinal manifold-valued data, namely repeated measurements of the
+same objects or individuals at several points in time. The model allows to estimate
+a group-average trajectory in the space of measurements. Random variations of
+this trajectory result from spatiotemporal transformations, which allow changes in
+the direction of the trajectory and in the pace at which trajectories are followed.
+The use of the tools of Riemannian geometry allows to derive a generic algorithm
+for any kind of data with smooth constraints, which lie therefore on a Riemannian
+manifold. Stochastic approximations of the Expectation-Maximization algorithm
+is used to estimate the model parameters in this highly non-linear setting. The
+method is used to estimate a data-driven model of the progressive impairments of
+cognitive functions during the onset of Alzheimer’s disease. Experimental results
+show that the model correctly put into correspondence the age at which each in-
+dividual was diagnosed with the disease, thus validating the fact that it effectively
+estimated a normative scenario of disease progression. Random effects provide
+unique insights into the variations in the ordering and timing of the succession of
+cognitive impairments across different individuals.
+
+1
+
+Introduction
+
+Age-related brain diseases, such as Parkinson’s or Alzheimer’s disease (AD) are complex diseases
+with multiple effects on the metabolism, structure and function of the brain. Models of disease pro-
+gression showing the sequence and timing of these effects during the course of the disease remain
+largely hypothetical [3, 13]. Large databases have been collected recently in the hope to give ex-
+perimental evidence of the patterns of disease progression based on the estimation of data-driven
+models. These databases are longitudinal, in the sense that they contain repeated measurements of
+several subjects at multiple time-points, but which do not necessarily correspond across subjects.
+Learning models of disease progression from such databases raises great methodological challenges.
+The main difﬁculty lies in the fact that the age of a given individual gives no information about the
+stage of disease progression of this individual. The onset of clinical symptoms of AD may vary from
+forty and eighty years of age, and the duration of the disease from few years to decades. Moreover,
+the onset of the disease does not correspond with the onset of the symptoms: according to recent
+studies, symptoms are likely to be preceded by a silent phase of the disease, for which little is
+known. As a consequence, statistical models based on the regression of measurements with age are
+inadequate to model disease progression.
+
+1
+
+The set of the measurements of a given individual at a speciﬁc time-point belongs to a high-
+dimensional space. Building a model of disease progression amounts to estimating continuous
+subject-speciﬁc trajectories in this space and average those trajectories among a group of individ-
+uals. Trajectories need to be registered in space, to account for the fact that individuals follow
+different trajectories, and in time, to account for the fact that individuals, even if they follow the
+same trajectory, may be at a different position on this trajectory at the same age.
+The framework of mixed-effects models seems to be well suited to deal with this hierarchical prob-
+lem. Mixed-effects models for longitudinal measurements were introduced in the seminal paper of
+Laird and Ware [15] and have been widely developed since then (see [6], [16] for instance). How-
+ever, this kind of models suffers from two main drawbacks regarding our problem. These models
+are built on the estimation of the distribution of the measurements at a given time point. In many
+situations, this reference time is given by the experimental set up: date at which treatment begins,
+date of seeding in studies of plant growth, etc. In studies of ageing, using these models would re-
+quire to register the data of each individual to a common stage of disease progression before being
+compared. Unfortunately, this stage is unknown and such a temporal registration is actually what
+we wish to estimate. Another limitation of usual mixed-effects models is that they are deﬁned for
+data lying in Euclidean spaces. However, measurements with smooth constraints usually cannot be
+summed up or scaled, such as normalized scores of neurospychological tests, positive deﬁnite sym-
+metric matrices, shapes encoded as images or meshes. These data are naturally modeled as points on
+Riemannian manifolds. Although the development of statistical models for manifold-valued data is
+a blooming topic, the construction of statistical models for longitudinal data on a manifold remains
+an open problem.
+The concept of “time-warp” was introduced in [8] to allow for temporal registration of trajectories
+of shape changes. Nevertheless, the combination of the time-warps with the intrinsic variability of
+shapes across individuals is done at the expense of a simplifying approximation: the variance of
+shapes does not depend on time whereas it should adapt with the average scenario of shape changes.
+Moreover, the estimation of the parameters of the statistical model is made by minimizing a sum of
+squares which results from an uncontrolled likelihood approximation. In [18], time-warps are used
+to deﬁne a metric between curves that are invariant under time reparameterization. This invariance,
+by deﬁnition, prevents the estimation of correspondences across trajectories, and therefore the esti-
+mation of distribution of trajectories in the spatiotemporal domain. In [17], the authors proposed a
+model for longitudinal image data but the model is not built on the inference of a statistical model
+and does not include a time reparametrization of the estimated trajectories.
+In this paper, we propose a generic statistical framework for the deﬁnition and estimation of mixed-
+effects models for longitudinal manifold-valued data. Using the tools of geometry allows us to derive
+a method that makes little assumptions about the data and problem to deal with. Modeling choices
+boil down to the deﬁnition of the metric on the manifold. This geometrical modeling also allows
+us to introduce the concept of parallel curves on a manifold, which is key to uniquely decompose
+differences seen in the data in a spatial and a temporal component. Because of the non-linearity
+of the model, the estimation of the parameters should be based on an adequate maximization of the
+observed likelihood. To address this issue, we propose to use a stochastic version of the Expectation-
+Maximization algorithm [5], namely the MCMC SAEM [2], for which theoretical results regarding
+the convergence have been proved in [4], [2].
+Experimental results on neuropsychological tests scores and estimates of scenarios of AD progres-
+sion are given in section 4.
+
+2 Spatiotemporal mixed-effects model for manifold-valued data
+
+2.1 Riemannian geometry setting
+
+The observed data consists in repeated multivariate measurements of p individuals. For a given
+individual, the measurements are obtained at time points ti,1 < . . . < ti,ni. The j-th measurement
+of the i-th individual is denoted by yi,j. We assume that each observation yi,j is a point on a
+N-dimensional Riemannian manifold M embedded in RP (with P ≥ N) and equipped with a
+M. We denote ∇M the covariant derivative. We assume that the manifold is
+Riemannian metric g
+geodesically complete, meaning that geodesics are deﬁned for all time.
+
+2
+
+We recall that a geodesic is a curve drawn on the manifold γ : R → M, which has no acceleration:
+∇M
+˙γ ˙γ = 0. For a point p ∈ M and a vector v ∈ TpM, the mapping Exp
+M
+p (v) denotes the
+Riemannian exponential, namely the point that is reached at time 1 by the geodesic starting at p
+with velocity v. The parallel transport of a vector X0 ∈ Tγ(t0)M in the tangent space at point γ(t0)
+on a curve γ is a time-indexed family of vectors X(t) ∈ Tγ(t)M which satisﬁes ∇M
+X(t) = 0
+and X(t0) = X0. We denote Pγ,t0,t(X0) the isometry that maps X0 to X(t).
+In order to describe our model, we need to introduce the notion of “parallel curves” on the manifold:
+Deﬁnition 1. Let γ be a curve on M deﬁned for all time, a time-point t0 ∈ R and a vector w ∈
+Tγ(t0)M, w (cid:54)= 0. One deﬁnes the curve s → ηw(γ, s), called parallel to the curve γ, as:
+
+˙γ(t)
+
+ηw(γ, s) = Exp
+
+M
+γ(s)
+
+(cid:0)Pγ,t0,s(w)(cid:1), s ∈ R.
+
+The idea is illustrated in Fig. 1. One uses the parallel transport to move the vector w from γ(t0) to
+γ(s) along γ. At the point γ(s), a new point on M is obtained by taking the Riemannian exponential
+of Pγ,t0,s(w). This new point is denoted by ηw(γ, s). As s varies, one describes a curve ηw(γ,·)
+on M, which can be understood as a “parallel” to the curve γ. It should be pointed out that, even
+if γ is a geodesic, ηw(γ,·) is, in general, not a geodesic of M. In the Euclidean case (i.e. a ﬂat
+manifold), the curve ηw(γ,·) is the translation of the curve γ: ηw(γ, s) = γ(s) + w.
+
+Figure 1: Model description on a schematic manifold. Figure a) (left) : a non-zero vector wi is
+choosen in Tγ(t0)M. Figure b) (middle) : the tangent vector wi is transported along the geodesic
+γ and a point ηwi(γ, s) is constructed at time s by use of the Riemannian exponential. Figure c)
+(right) : The curve ηwi(γ,·) is the parallel resulting from the construction.
+
+2.2 Generic spatiotemporal model for longitudinal data
+Our model is built in a hierarchical manner: data points are seen as samples along individ-
+ual trajectories, and these trajectories derive from a group-average trajectory. The model writes
+yi,j = ηwi(γ, ψi(ti,j)) + εi,j, where we assume the group-average trajectory to be a geodesic,
+denoted γ from now on. Individual trajectories derive from the group average by spatiotemporal
+transformations. They are deﬁned as a time re-parameterization of a trajectory that is parallel to the
+group-average: t → ηwi(γ, ψi(t)). For the ith individual, wi denotes a non-zero tangent vector in
+Tγ(t0)M, for some speciﬁc time point t0 that needs to be estimated, and which is orthogonal to the
+tangent vector ˙γ(t0) for the inner product given by the metric ((cid:104)·,·(cid:105)γ(t0) = g
+M
+γ(t0)). The time-warp
+function ψi is deﬁned as: ψi(t) = αi(t − t0 − τi) + t0. The parameter αi is an acceleration factor
+which encodes whether the i-th individual is progressing faster or slower than the average, τi is a
+time-shift which characterizes the advance or delay of the ith individual with respect to the average
+and wi is a space-shift which encodes the variability in the measurements across individuals at the
+same stage of progression.
+The normal tubular neighborhood theorem ([11]) ensures that parallel shifting deﬁnes a spatio-
+temporal coordinate system as long as the vectors wi are choosen orthogonal and sufﬁcently small.
+The orthogonality condition on the tangent vectors wi is necessary to ensure the identiﬁability of
+the model. Indeed, if a vector wi was not choosen orthogonal, its orthogonal projection would play
+the same role as the acceleration factor.The spatial and temporal transformations commute, in the
+sense that one may re-parameterize the average trajectory before building the parallel curve, or vice
+versa. Mathematically, this writes ηwi(γ ◦ ψi, s) = ηwi(γ, ψi(s)). This relation also explains the
+particular form of the afﬁne time-warp ψi. The geodesic γ is characterized by the fact that it passes
+
+3
+
+Figure a) Figure b) Figure c) at time-point t0 by point p0 = γ(t0) with velocity v0 = ˙γ(t0). Then, γ ◦ ψi is the same trajectory,
+except that it passes by point p0 at time t0 + τi with velocity αiv0.
+The ﬁxed effects of the model are the parameters of the average geodesic:
+the point p0 on the
+manifold, the time-point t0 and the velocity v0. The random effects are the acceleration factors
+αi, time-shifts τi and space-shifts wi. The ﬁrst two random effects are scalars. One assumes the
+acceleration factors to follow a log-normal distribution (they need to be positive in order not to
+reverse time), and time-shifts to follow a zero-mean Gaussian distribution. Space-shifts are vectors
+of dimension N − 1 in the hyperplane ˙γ(t0)⊥ in Tγ(t0)M. In the spirit of independent component
+analysis [12], we assume that wi’s result from the superposition of Ns < N statistically independent
+components. This writes wi = Asi where A is a N × Ns matrix of rank Ns, si a vector of
+Ns independent sources following a heavy tail Laplace distribution with ﬁxed parameter, and each
+column cj(A) (1 ≤ j ≤ Ns) of A satisﬁes the orthogonality condition (cid:104)cj(A), ˙γ(t0)(cid:105)γ(t0) = 0.
+For the dataset (ti,j, yi,j) (1 ≤ i ≤ p, 1 ≤ j ≤ ni), the model may be summarized as:
+
+yi,j = ηwi(γ, ψi(ti,j)) + εi,j.
+with ψi(t) = αi(t − t0 − τi) + t0, αi = exp(ξi), wi = Asi and
+
+(1)
+
+i.i.d.∼ N (0, σ2
+
+η), τi
+
+ξi
+
+i.i.d.∼ N (0, σ2
+
+τ ), εi,j
+
+i.i.d.∼ N (0, σ2IN ), si,l
+
+i.i.d.∼ Laplace(1/2).
+
+Eventually, the parameters of the model one needs to estimate are the ﬁxed effects and the variance
+of the random effects, namely θ = (p0, t0, v0, σξ, στ , σ, vec(A)).
+
+M
+
+2.3 Propagation model in a product manifold
+We wish to use these developments to study the temporal progression of a family of biomarkers.
+We assume that each component of yi,j is a scalar measurement of a given biomarker and belongs
+to a geodesically complete one-dimensional manifold (M, g). Therefore, each measurement yi,j is
+a point in the product manifold M = M N , which we assume to be equipped with the Riemannian
+product metric g
+= g + . . . + g. We denote γ0 the geodesic of the one-dimensional manifold
+M which goes through the point p0 ∈ M at time t0 with velocity v0 ∈ Tp0M. In order to deter-
+mine relative progression of the biomarkers among themselves, we consider a parametric family of
+
+geodesics of M : γδ(t) =(cid:0)γ0(t), γ0(t+δ1), . . . , γ0(t+δN−1)(cid:1). We assume here that all biomarkers
+measured by the vector δ =(cid:0)0, δ1, . . . , δN−1
+(cid:1), which becomes a ﬁxed effect of the model.
+(cid:0) w1
+(γ1(t), . . . , γN (t)), we have ηw(γ, s) =(cid:0)γ1
+(cid:0) wN
+˙γ(t0) + s(cid:1)(cid:1), s ∈ R.
+˙γ(t0) + s(cid:1), . . . , γN
+
+In this setting, a curve that is parallel to a geodesic γ is given by the following lemma :
+Lemma 1. Let γ be a geodesic of the product manifold M = M N and let t0 ∈ R.
+ηw(γ,·) denotes a parallel to the geodesic γ with w = (w1, . . . , wN
+
+have on average the same dynamics but shifted in time. This hypothesis allows to model a temporal
+succession of effects during the course of the disease. The relative timing in biomarker changes is
+
+If
+
+(cid:1) ∈ Tγ(t0)M and γ(t) =
+(cid:17)
+
+As a consequence, a parallel to the average trajectory γδ has the same form as the geodesic but with
+randomly perturbed delays. The model (1) writes : for all k ∈ {1, . . . , N},
++ αi(ti,j − t0 − τi) + t0 + δk−1
+
+yi,j,k = γ0
+
++ εi,j,k.
+
+wk,i
+
+(2)
+
+(cid:16)
+
+˙γ0(t0 + δk−1)
+
+where wk,i denotes the k-th component of the space-shift wi and yi,j,k, the measurement of the k-th
+biomarker, at the j-th time point, for the i-th individual.
+
+2.4 Multivariate logistic curves model
+The propagation model given in (2) is now described for normalized biomarkers, such as scores of
+neuropsychological tests. In this case, we assume the manifold to be M =]0, 1[ and equipped with
+the Riemannian metric g given by : for p ∈]0, 1[, (u, v) ∈ TpM × TpM, gp(u, v) = uG(p)v with
+G(p) = 1/(p2(1 − p)2). The geodesics given by this metric in the one-dimensional Riemannian
+
+manifold M are logistic curves of the form : γ0(t) =(cid:0)1 + ( 1
+
+p0(1−p0) (t − t0)(cid:1)(cid:1)−1
+
+and leads to the multivariate logistic curves model in M. We can notice the quite unusual paramater-
+ization of the logistic curve. This parametrization naturally arise because γ0 satisﬁes : γ0(t0) = p0
+and ˙γ0(t0) = v0. In this case, the model (1) writes:
+
+− 1) exp(cid:0) −
+
+p0
+
+v0
+
+4
+
+(cid:32)
+
+yi,j,k =
+
+1 +
+
+(cid:32)
+
+(cid:17)
+
+− 1
+
+(cid:16) 1
+
+p0
+
+exp
+
+− v0αi(ti,j − t0 − τi) + v0δk + v0
+
+p0(1 − p0)
+
+(Asi)k
+
+˙γ0(t0+δk)
+
+(cid:33)(cid:33)−1
+
++ εi,j,k, (3)
+
+where (Asi)k denotes the k-th component of the vector Asi. Note that (3) is not equivalent to a
+linear model on the logit of the observations. The logit transform corresponds to the Riemannian
+logarithm at p0 = 0.5.
+In our framework, p0 is not ﬁxed, but estimated as a parameter of our
+model. Even with a ﬁxed p0 = 0.5, the model is still non-linear due to the multiplication between
+random-effects αi and τi, and therefore does not boil down to the usual linear model [15].
+
+3 Parameters estimation
+In this section, we explain how to use a stochastic version of the Expectation-Maximization (EM)
+algorithm [5] to produce estimates of the parameters θ = (p0, t0, v0, δ, σξ, στ , σ, vec(A)) of the
+model. The algorithm detailed in this section is essentially the same as in [2]. Its scope of applica-
+tion is not limited to statistical models on product manifolds and the MCMC-SAEM algorithm can
+actually be used for the inference of a very large family of statistical models.
+The random effects z = (ξi, τi, sj,i) (1 ≤ i ≤ p and 1 ≤ j ≤ Ns) are considered as hidden variables.
+With the observed data y = (yi,j,k)i,j,k, (y, z) form the complete data of the model. In this context,
+the Expectation-Maximization (EM) algorithm proposed in [5] is very efﬁcient to compute the max-
+imum likelihood estimate of θ. Due to the nonlinearity and complexity of the model, the E step is
+intractable. As a consequence, we considered a stochastic version of the EM algorithm, namely the
+Monte-Carlo Markov Chain Stochastic Approximation Expectation-Maximization (MCMC-SAEM)
+algorithm [2], based on [4]. This algorithm is an EM-like algorithm which alternates between three
+steps: simulation, stochastic approximation and maximization. If θ(t) denotes the current parameter
+estimates of the algorithm, in the simulation step, a sample z(t) of the missing data is obtained from
+the transition kernel of an ergodic Markov chain whose stationary distribution is the conditional
+distribution of the missing data z knowing y and θ(t), denoted by q(z| y, θ(t)). This simulation
+step is achieved using Hasting-Metropolis within Gibbs sampler. Note that the high complexity of
+our model prevents us from resorting to sampling methods as in [10] as they would require heavy
+computations, such as the Fisher information matrix. The stochastic approximation step consists in
+a stochastic approximation on the complete log-likelihood log q(y, z| θ) summarized as follows :
+Qt(θ) = Qt−1(θ) + εt [log q(y, z| θ) − Qt−1(θ)], where (εt)t is a decreasing sequence of positive
+t < +∞. Finally, the parameter estimates
+
+step-sizes in ]0, 1] which satisﬁes(cid:80)
+
+t εt = +∞ and(cid:80)
+
+t ε2
+
+), v0 ∼ N (v0, σ2
+
+are updated in the maximization step according to: θ(t+1) = argmaxθ∈Θ Qt(θ).
+The theoretical convergence of the MCMC SAEM algorithm is proved only if the model be-
+long to the curved exponential family. Or equivalently, if the complete log-likelihood of the
+log q(y, z| θ) = −φ(θ) + S(y, z)(cid:62)ψ(θ), where S(y, z) is a sufﬁcent
+model may be written :
+statistic of the model. In this case, the stochastic approximation on the complete log-likelihood
+can be replaced with a stochastic approximation on the sufﬁcent statistics of the model. Note
+that the multivariate logistic curves model does not belong to the curved exponential family. A
+usual workaround consists in regarding the parameters of the model as realizations of indepen-
+dents Gaussian random variables ([14]) : θ ∼ N (θ, D) where D is a diagonal matrix with
+very small diagonal entries and the estimation now targets θ. This yields: p0 ∼ N (p0, σ2
+),
+t0 ∼ N (t0, σ2
+δ ). To ensure the orthogo-
+nality condition on the columns of A, we assumed that A follows a normal distribution on the
+
+space Σ = {A = (c1(A), . . . , cNs(A)) ∈ (cid:0)Tγδ(t0)M(cid:1)Ns ; ∀j, (cid:104)cj(A), ˙γδ(t0)(cid:105)γδ(t0) = 0}.
+Equivalently, we assume that the matrix A writes : A = (cid:80)(N−1)Ns
+
+βkBk where, for all k,
+β) and (B1, . . . ,B(N−1)Ns) is an orthonormal basis of Σ obtained by applica-
+βk
+tion of the Gram-Schmidt process to a basis of Σ. The random variables β1, . . . , β(N−1)Ns
+are considered as new hidden variables of the model. The parameters of the model are θ =
+(p0, t0, v0, (δk)1≤k≤N−1, (βk)1≤k≤(N−1)Ns, σξ, στ , σ) whereas the hidden variables of the model
+are z = (p0, t0, v0, (δk)1≤k≤N−1, (βk)1≤k≤(N−1)Ns, (ξi)1≤i≤p, (τi)1≤i≤p, (sj,i)1≤j≤Ns, 1≤i≤p).
+The algorithm (1) given below summarizes the SAEM algorithm for this model.
+The MCMC-SAEM algorithm 1 was tested on synthetic data generated according to (3). The
+MCMC-SAEM allowed to recover the parameters used to generate the synthetic dataset.
+
+) and, for all k, δk ∼ N (δk, σ2
+
+i.i.d.∼ N (βk, σ2
+
+t0
+
+v0
+
+p0
+
+k=1
+
+5
+
+Algorithm 1 Overview of the MCMC SAEM algorithm for the multivariate logistic curves model.
+
+ulation step of the k-th iteration of the MCMC SAEM, let fi,j = [fi,j,l] ∈ RN and fi,j,l
+be the l-th component of ηw(k)
+=
+
+(cid:1) denotes the vector of hidden variables obtained in the sim-
+(cid:0)(γδ)(k), exp(ξ(k)
+(cid:1) and w(k)
+
+)(ti,j − t(k)
+
+0 − τ (k)
+
+0 , . . . , (s(k)
+
+) + t(k)
+
+0 , t(k)
+
+j,i
+
+0
+
+i
+
+i
+
+i
+
+i
+
+l Bl.
+β(k)
+l=1
+Initialization :
+θ ← θ(0) ; z(0) ← random ; S ← 0 ; (εk)k≥0.
+repeat
+
+If z(k) = (cid:0)p(k)
+(cid:80)(N−1)Ns
+Simulation step : z(k) =(cid:0)p(k)
+1 ← (cid:2)y(cid:62)
+with (1 ≤ i ≤ p ; 1 ≤ j ≤ ni) and K = (cid:80)p
+(cid:105)
+(cid:104)
+9 ←(cid:104)
+
+∈ Rp ; S(k)
+i
+β(k)
+j
+
+Compute the sufﬁcent statistics : S(k)
+
+∈ R(N−1)Ns.
+
+5 ← p(k)
+
+6 ← t(k)
+
+0 , . . . , (s(k)
+
+0 , t(k)
+
+i
+S(k)
+
+; S(k)
+
+j,i )j,i
+
+(τ (k)
+
+(cid:105)
+
+)2
+
+0
+
+0
+
+j
+
+(cid:1) ← Gibbs Sampler(z(k−1), y, θ(k−1))
+2 ← (cid:2)(cid:107)fi,j(cid:107)2(cid:3)
+(cid:3)
+(cid:105)
+(cid:104)
+i,j ∈ RK
+(cid:105)
+8 ← (cid:104)
+4 ←
+∈ RN−1 ;
+
+i=1 ni ; S(k)
+3 =
+7 ← v(k)
+; S(k)
+
+∈ Rp ; S(k)
+i
+δ(k)
+j
+
+∈ RK ; S(k)
+
+i
+; S(k)
+
+(ξ(k)
+
+)2
+
+i,j
+
+0
+
+j
+
+i,jfi,j
+
+Stochastic approximation step : S(k+1)
+(k+1) ← S(k)
+Maximization step : p0
+for all 1 ≤ j ≤ N − 1 ; β
+; σ(k+1)
+
+← S(k)
+(k+1) ← S(k)
+; t0
+; δ
+← (S(k)
+9 )j for all 1 ≤ j ≤ (N − 1)Ns ; σ(k+1)
+4 )(cid:62)1p ; σ(k+1) ← 1√
+
+j + εk(S(y, z(k)) − S(k)
+(cid:0)(cid:80)
+
+) for j ∈ {1, . . . , 9}.
+← (S(k)
+8 )j
+← 1
+3 )(cid:62)1p
+p (S(k)
+2 )(cid:62)1K
+
+1 )(cid:62)1K + (S(k)
+
+i,j,k − 2(S(k)
+
+(k+1) ← S(k)
+
+(cid:1)1/2.
+
+(k+1)
+j
+
+(k+1)
+j
+
+← 1
+
+i,j,k y2
+
+p (S(k)
+
+; v0
+
+6
+
+5
+
+7
+
+τ
+
+ξ
+
+j
+
+j
+
+N K
+
+until convergence.
+return θ.
+
+4 Experiments
+4.1 Data
+We use the neuropsychological assessment test “ADAS-Cog 13” from the ADNI1, ADNIGO or
+ADNI2 cohorts of the Alzheimer’s Disease Neuroimaging Initiative (ADNI) [1]. The “ADAS-Cog
+13” consists of 13 questions, which allow to test the impairment of several cognitive functions.
+For the purpose of our analysis, these items are grouped into four categories: memory (5 items),
+language (5 items), praxis (2 items) and concentration (1 item). Scores within each category are
+added and normalized by the maximum possible score. Consequently, each data point consists in
+four normalized scores, which can be seen as a point on the manifold M =]0, 1[4.
+We included 248 individuals in the study, who were diagnosed with mild cognitive impairment
+(MCI) at their ﬁrst visit and whose diagnosis changed to AD before their last visit. There is an aver-
+age of 6 visits per subjects (min: 3, max: 11), with an average duration of 6 or 12 months between
+consecutive visits. The multivariate logistic curves model was used to analyze this longitudinal data.
+
+4.2 Experimental results
+
+The model was applied with Ns = 1, 2 or 3 independent sources. In each experiment, the MCMC
+SAEM was run ﬁve times with different initial parameter values. The experiment which returned
+the smallest residual variance σ2 was kept. The maximum number of iterations was arbitrarily set
+to 5000 and the number of burn-in iterations was set to 3000 iterations. The limit of 5000 iterations
+is enough to observe the convergence of the sequences of parameters estimates. As a result, two
+and three sources allowed to decrease the residual variance better than one source (σ2 = 0.012 for
+one source, σ2 = 0.08 for two sources and σ2 = 0.084 for three sources). The residual variance
+σ2 = 0.012 (resp. σ2 = 0.08, σ2 = 0.084) mean that the model allowed to explain 79% (resp.
+84%, 85%) of the total variance. We implemented our algorithm in MATLAB without any particular
+optimization scheme. The 5000 iterations require approximately one day.
+The number of parameters to be estimated is equal to 9 + 3Ns. Therefore, the number of sources
+do not dramatically impact the runtime. Simulation is the most computationally expensive part of
+
+6
+
+our algorithm. For each run of the Hasting-Metropolis algorithm, the proposal distribution is the
+prior distribution. As a consequence, the acceptation ratio simpliﬁes [2] and one computation of
+the acceptation ratio requires two computations of the likelihood of the observations, conditionally
+on different vectors of latent variables and the vector of current parameters estimates. The runtime
+could be improved by parallelizing the sampling per individuals.
+For a matter of clarity and because the results obtained with three sources were similar to the results
+with two sources, we report here the experimental results obtained with two independent sources.
+The average model of disease progression γδ is plotted in Fig. 2. The estimated ﬁxed effects are
+p0 = 0.3, t0 = 72 years, v0 = 0.04 unit per year, and δ = [0;−15;−13;−5] years. This means
+that, on average, the memory score (ﬁrst coordinate) reaches the value p0 = 0.3 at t0 = 72 years,
+followed by concentration which reaches the same value at t0 + 5 = 77 years, and then by praxis
+and language at age 85 and 87 years respectively.
+Random effects show the variability of this average trajectory within the studied population. The
+standard deviation of the time-shift equals στ = 7.5 years, meaning that the disease progression
+model in Fig. 2 is shifted by ±7.5 years to account for the variability in the age of disease onset.
+The effects of the variance of the acceleration factors, and the two independent components of the
+space-shifts are illustrated in Fig. 4. The acceleration factors shows the variability in the pace of
+disease progression, which ranges between 7 times faster and 7 times slower than the average. The
+ﬁrst independent component shows variability in the relative timing of the cognitive impairments:
+in one direction, memory and concentration are impaired nearly at the same time, followed by
+language and praxis; in the other direction, memory is followed by concentration and then language
+and praxis are nearly superimposed. The second independent component keeps almost ﬁxed the
+timing of memory and concentration, and shows a great variability in the relative timing of praxis
+and language impairment. It shows that the ordering of the last two may be inverted in different
+individuals. Overall, these space-shift components show that the onset of cognitive impairment
+tends to occur by pairs: memory & concentration followed by language & praxis.
+Individual estimates of the random effects are obtained from the simulation step of the last iteration
+of the algorithm and are plotted in Fig. 5. The ﬁgure shows that the estimated individual time-shifts
+correspond well to the age at which individuals were diagnosed with AD. This means that the value
+p0 estimated by the model is a good threshold to determine diagnosis (a fact that has occurred by
+chance), and more importantly that the time-warp correctly register the dynamics of the individual
+trajectories so that the normalized age correspond to the same stage of disease progression across
+individuals. This fact is corroborated by Fig. 3 which shows that the normalized age of conversion
+to AD is picked at 77 years old with a small variance compared to the real distribution of age of
+conversion.
+
+Figure 2: The four curves represent the es-
+timated average trajectory. A vertical line is
+drawn at t0 = 72 years old and an horizontal
+line is drawn at p0 = 0.3.
+
+7
+
+i
+
+red) : histogram
+Figure 3: In blue (resp.
+of the ages of conversion to AD (tdiag
+)
+(resp. normalized ages of conversion to AD
+(ψi(tdiag
+
+))), with ψi time-warp as in (1).
+
+i
+
+Figure 4: Variability in disease progression superimposed with the average trajectory γδ (dotted
+lines): effects of the acceleration factor with plots of γδ
+ﬁrst and second independent component of space-shift with plots of η±σsi ci(A)(γδ,·) for i = 1 or
+2 (second and third column respectively).
+
+(cid:0) exp(±σξ)(t − t0) + t0
+
+(cid:1) (ﬁrst column),
+
+Figure 5: Plots of individual random effects:
+log-acceleration factor ξi = log(αi) against
+time-shifts t0 + τi. Color corresponds to the
+age of conversion to AD.
+
+4.3 Discussion and perspectives
+
+We proposed a generic spatiotemporal model to analyze longitudinal manifold-valued measure-
+ments. The ﬁxed effects deﬁne a group-average trajectory, which is a geodesic on the data manifold.
+Random effects are subject-speciﬁc acceleration factor, time-shift and space-shift which provide in-
+sightful information about the variations in the direction of the individual trajectories and the relative
+pace at which they are followed.
+This model was used to estimate a normative scenario of Alzheimer’s disease progression from
+neuropsychological tests. We validated the estimates of the spatiotemporal registration between
+individual trajectories by the fact that they put into correspondence the same event on individual
+trajectories, namely the age at diagnosis. Alternatives to estimate model of disease progression
+include the event-based model [9], which estimates the ordering of categorical variables. Our model
+may be seen as a generalization of this model for continuous variables, which do not only estimate
+the ordering of the events but also the relative timing between them. Practical solutions to combine
+spatial and temporal sources of variations in longitudinal data are given in [7]. Our goal was here to
+propose theoretical and algorithmic foundations for the systematic treatment of such questions.
+
+8
+
+-σ +σ Acceleration factor 𝛼𝑖 Independent component 𝐴1 Independent component 𝐴2 References
+[1] The Alzheimer’s Disease Neuroimaging Initiative, https://ida.loni.usc.edu/
+[2] Allassonni`ere, S., Kuhn, E., Trouv´e, A.: Construction of bayesian deformable models via a stochastic
+
+approximation algorithm: a convergence study. Bernoulli 16(3), 641–678 (2010)
+
+[3] Braak, H., Braak, E.: Staging of alzheimer’s disease-related neuroﬁbrillary changes. Neurobiology of
+
+aging 16(3), 271–278 (1995)
+
+[4] Delyon, B., Lavielle, M., Moulines, E.: Convergence of a stochastic approximation version of the em
+
+algorithm. Annals of statistics pp. 94–128 (1999)
+
+[5] Dempster, A.P., Laird, N.M., Rubin, D.B.: Maximum likelihood from incomplete data via the em algo-
+
+rithm. Journal of the royal statistical society. Series B (methodological) pp. 1–38 (1977)
+
+[6] Diggle, P., Heagerty, P., Liang, K.Y., Zeger, S.: Analysis of longitudinal data. Oxford University Press
+
+(2002)
+
+[7] Donohue, M.C., Jacqmin-Gadda, H., Le Goff, M., Thomas, R.G., Raman, R., Gamst, A.C., Beckett, L.A.,
+Jack, C.R., Weiner, M.W., Dartigues, J.F., Aisen, P.S., the Alzheimer’s Disease Neuroimaging Initiative:
+Estimating long-term multivariate progression from short-term data. Alzheimer’s & Dementia 10(5), 400–
+410 (2014)
+
+[8] Durrleman, S., Pennec, X., Trouv´e, A., Braga, J., Gerig, G., Ayache, N.: Toward a comprehensive frame-
+work for the spatiotemporal statistical analysis of longitudinal shape data. International Journal of Com-
+puter Vision 103(1), 22–59 (2013)
+
+[9] Fonteijn, H.M., Modat, M., Clarkson, M.J., Barnes, J., Lehmann, M., Hobbs, N.Z., Scahill, R.I., Tabrizi,
+S.J., Ourselin, S., Fox, N.C., et al.: An event-based model for disease progression and its application in
+familial alzheimer’s disease and huntington’s disease. NeuroImage 60(3), 1880–1889 (2012)
+
+[10] Girolami, M., Calderhead, B.: Riemann manifold langevin and hamiltonian monte carlo methods. Journal
+
+of the Royal Statistical Society: Series B (Statistical Methodology) 73(2), 123–214 (2011)
+
+[11] Hirsch, M.W.: Differential topology. Springer Science & Business Media (2012)
+[12] Hyv¨arinen, A., Karhunen, J., Oja, E.: Independent component analysis, vol. 46. John Wiley & Sons
+
+(2004)
+
+[13] Jack, C.R., Knopman, D.S., Jagust, W.J., Shaw, L.M., Aisen, P.S., Weiner, M.W., Petersen, R.C., Tro-
+janowski, J.Q.: Hypothetical model of dynamic biomarkers of the alzheimer’s pathological cascade. The
+Lancet Neurology 9(1), 119–128 (2010)
+
+[14] Kuhn, E., Lavielle, M.: Maximum likelihood estimation in nonlinear mixed effects models. Computa-
+
+tional Statistics & Data Analysis 49(4), 1020–1038 (2005)
+
+[15] Laird, N.M., Ware, J.H.: Random-effects models for longitudinal data. Biometrics pp. 963–974 (1982)
+[16] Singer, J.D., Willett, J.B.: Applied longitudinal data analysis: Modeling change and event occurrence.
+
+Oxford university press (2003)
+
+[17] Singh, N., Hinkle, J., Joshi, S., Fletcher, P.T.: A hierarchical geodesic model for diffeomorphic longitudi-
+
+nal shape analysis. In: Information Processing in Medical Imaging. pp. 560–571. Springer (2013)
+
+[18] Su, J., Kurtek, S., Klassen, E., Srivastava, A., et al.: Statistical analysis of trajectories on riemannian
+manifolds: Bird migration, hurricane tracking and video surveillance. The Annals of Applied Statistics
+8(1), 530–552 (2014)
+
+9
+
+

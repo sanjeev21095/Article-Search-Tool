@@ -1,0 +1,829 @@
+Sample Complexity Bounds for Iterative Stochastic
+
+Policy Optimization
+
+Marin Kobilarov
+
+Department of Mechanical Engineering
+
+Johns Hopkins University
+
+Baltimore, MD 21218
+marin@jhu.edu
+
+Abstract
+
+This paper is concerned with robustness analysis of decision making under un-
+certainty. We consider a class of iterative stochastic policy optimization problems
+and analyze the resulting expected performance for each newly updated policy
+at each iteration.
+In particular, we employ concentration-of-measure inequali-
+ties to compute future expected cost and probability of constraint violation using
+empirical runs. A novel inequality bound is derived that accounts for the possi-
+bly unbounded change-of-measure likelihood ratio resulting from iterative policy
+adaptation. The bound serves as a high-conﬁdence certiﬁcate for providing future
+performance or safety guarantees. The approach is illustrated with a simple robot
+control scenario and initial steps towards applications to challenging aerial vehicle
+navigation problems are presented.
+
+1
+
+Introduction
+
+We consider a general class of stochastic optimization problems formulated as
+
+ξ∗ = arg min
+
+ξ
+
+Eτ∼p(·|ξ)[J(τ )],
+
+(1)
+
+where ξ deﬁnes a vector of decision variables, τ represents the system response deﬁned through
+the density p(τ|ξ), and J(τ ) deﬁnes a positive cost function which can be non-smooth and non-
+convex. It is assumed that p(τ|ξ) is either known or can be sampled from, e.g.
+in a black-box
+manner. The objective is to obtain high-conﬁdence sample complexity bounds on the expected cost
+for a given decision strategy by observing past realizations of possibly different strategies. Such
+bounds are useful for two reasons: 1) for providing robustness guarantees for future executions, and
+2) for designing new algorithms that directly minimize the bound and therefore are expected to have
+built-in robustness.
+Our primary motivation arises from applications in robotics, for instance when a robot executes
+control policies to achieve a given task such as navigating to a desired state while perceiving the
+environment and avoiding obstacles. Such problems are traditionally considered in the framework
+of reinforcement learning and addressed using policy search algorithms, e.g. [1, 2] (see also [3] for a
+comprehensive overview with a focus on robotic applications [4]). When an uncertain system model
+is available the problem is equivalent to robust model-predictive control (MPC) [5].
+Our speciﬁc focus is on providing formal guarantees on future executions of control algorithms in
+terms of maximum expected cost (quantifying performance) and maximum probability of constraint
+violation (quantifying safety). Such bounds determine the reliability of control in the presence of
+process, measurement and parameter uncertainties, and contextual changes in the task. In this work
+we make no assumptions about nature of the system structure, such as linearity, convexity, or Gaus-
+sianity. In addition, the proposed approach applies either to a physical system without an available
+
+1
+
+model, to an analytical stochastic model, or to a white-box model (e.g. from a high-ﬁdelity open-
+source physics engine). In this context, PAC bounds have been rarely considered but could prove
+essential for system certiﬁcation, by providing high-conﬁdence guarantees for future performance
+and safety, for instance “with 99% chance the robot will reach the goal within 5 minutes”, or “with
+99% chance the robot will not collide with obstacles”.
+Approach. To cope with such general conditions, we study robustness through a statistical learn-
+ing viewpoint [6, 7, 8] using ﬁnite-time sample complexity bounds on performance based on em-
+pirical runs. This is accomplished using concentration-of-measure inequalities [9] which provide
+only probabilistic bounds , i.e. they certify the algorithm execution in terms of statements such as:
+“in future executions, with 99% chance the expected cost will be less than X and the probability of
+collision will be less than Y”. While such bounds are generally applicable to any stochastic decision
+making process, our focus and initial evaluation is on stochastic control problems.
+Randomized methods in control analysis. Our approach is also inspired by existing work on
+randomized algorithms in control theory originally motivated by robust linear control design [10].
+For example, early work focused on probabilistic root-locus design [11] and later applied to con-
+straint satisfaction [12] and general cost functions [13]. High-conﬁdence bounds for decidability of
+linear stability were reﬁned in [14]. These are closely related to the concepts of randomized sta-
+bility robustness analysis (RSRA) and randomized performance robustness analysis (RPRA) [13].
+Finite-time probabilistic bounds for system identiﬁcation problems have also been obtained through
+a statistical learning viewpoint [15].
+
+2
+
+Iterative Stochastic Policy Optimization
+
+Instead of directly searching for the optimal ξ to solve (1) a common strategy in direct policy search
+and global optimization [16, 17, 18, 19, 20, 21] is to iteratively construct a surrogate stochastic
+model π(ξ|ν) with hyper-parameters ν ∈ V, such as a Gaussian Mixture Model (GMM), where V
+is a vector space. The model induces a joint density p(τ, ξ|ν) = p(τ|ξ)π(ξ|ν) encoding natural
+stochasticity p(τ|ξ) and artiﬁcial control-exploration stochasticity π(ξ|ν). The problem is then to
+ﬁnd ν to minimize the expected cost
+
+J (v) (cid:44) E τ,ξ∼p(·|ν) [J(τ )],
+
+iteratively until convergence, which in many cases also corresponds to π(·|ν) shrinking close to a
+delta function around the optimal ξ∗ (or to multiple peaks when multiple disparate optima exist as
+long as π is multi-modal).
+The typical ﬂow of the iterative policy optimization algorithms considered in this work is:
+
+Iterative Stochastic Policy Optimization (ISPO)
+
+0. Start with initial hyper-parameters ν0 (i.e. a prior), set i = 0
+1. Sample M trajectories (ξj, τj) ∼ p(·|νi) for j = 1, . . . , M
+2. Compute new policy νi+1 using observed costs J(τj)
+3. Compute bound on expected cost and Stop if below threshold, else set i = i+1 and Goto 1
+
+The purpose of computing probably-approximate bounds is two-fold: a) to analyze the performance
+of such standard policy search algorithms; b) to design new algorithms by not directly minimizing
+an estimate of the expected cost, but by minimizing an upper conﬁdence bound on the expected
+cost instead. The computed policy will thus have “built-in” robustness in the sense that, with high-
+probability, the resulting cost will not exceed an a-priori known value. The present paper develops
+bounds applicable to both (a) and (b), but only explores their application to (a), i.e. to the analysis
+of existing iterative policy search methods.
+Cost functions. We consider two classes of cost functions J. The ﬁrst class encodes system per-
+formance and is deﬁned as a bounded real-valued function such that 0 ≤ J(τ ) ≤ b for any τ.
+The second are binary-valued indicator functions representing constraint violation. Assume that the
+variable τ must satisfy the condition g(τ ) ≤ 0. The cost is then deﬁned as J(τ ) = I{g(τ )>0} and its
+expectation can be regarded as the probability of constraint violation, i.e.
+
+P(g(τ ) > 0) = Eτ∼p(·|ξ)I{g(τ )>0}.
+
+In this work, we will be obtain bounds for both classes of cost functions.
+
+2
+
+3 A Speciﬁc Application: Discrete-time Stochastic Control
+
+We next illustrate the general stochastic optimization setting using a classical discrete-time non-
+linear optimal control problem. Speciﬁc instances of such control problems will later be used for
+numerical evaluation. Consider a discrete-time dynamical model with state xk ∈ X, where X is
+an n-dimensional manifold, and control inputs uk ∈ Rm at time tk ∈ [0, T ] where k = 0, . . . , N
+denotes the time stage. Assume that the system dynamics are given by
+
+xk+1 = fk(xk, uk, wk),
+
+subject to
+
+gk(xk, uk) ≤ 0, gN (xN ) ≤ 0,
+
+where fk and gk correspond either to the physical plant, to an analytical model, or to a “white-box”
+high-ﬁdelity physics-engine update step. The terms wk denotes process noise. Equivalently, such a
+formulation induces the process model density p(xk+1|xk, uk). In addition, consider the cost
+
+J(x0:N , u0:N−1) (cid:44) N−1(cid:88)
+
+k=0
+
+Lk(xk, uk) + LN (xN ),
+
+where x0:N (cid:44) {x0, . . . , xN} denotes the complete trajectory and Lk are given nonlinear functions.
+Our goal is to design feedback control policies to optimize the expected value of J. For simplicity,
+we will assume perfect measurements although this does not impose a limitation on the approach.
+Assume that any decision variables in the problem (such as feedforward or feedback gains, obstacle
+avoidance terms, mode switching variables) are encoded using a ﬁnite-dimensional vector ξ ∈ Rnξ
+and deﬁne the control law uk = Φk(xk)ξ using basis functions Φk(x) ∈ Rm×nξ for all k =
+0, . . . , N − 1. This representation captures both static feedback control laws as well as time-varying
+optimal control laws of the form uk = u∗
+k = B(tk)ξ is an optimized
+feedforward control (parametrized using basis functions B(t) ∈ Rm×z such as B-splines), K LQR
+is the optimal feedback gain matrix of the LQR problem based on the linearized dynamics and
+second-order cost expansion around the optimized nominal reference trajectory x∗, i.e. such that
+x∗
+k+1 = fk(x∗
+The complete trajectory of the system is denoted by the random variable τ = (x0:N , u0:N−1) and
+has density p(τ|ξ) = p(x0)ΠN−1
+k=0 p(xk+1|xk, uk)δ(uk − Φk(xk)ξ), where δ(·) is the Dirac delta.
+k=0 {gk(xk, uk) ≤ 0} ∧ {gN (xN ) ≤ 0}.
+
+The trajectory constraint takes the form {g(τ ) ≤ 0} (cid:44)(cid:86)N−1
+
+k) where u∗
+
+(xk − x∗
+
+k, u∗
+
+k + K LQR
+
+k
+
+k, 0).
+
+k
+
+A simple example. As an example, consider a point-mass robot modeled as a double-integrator
+system with state x = (p, v) where p ∈ Rd denotes position and v ∈ Rd denotes velocity with d = 2
+for planar workspaces and d = 3 for 3-D workspaces. The dynamics is given, for ∆t = T /N, by
+
+pk+1 = pk + ∆tvk +
+
+1
+2
+
+∆t2(uk + wk),
+
+vk+1 = vk + ∆t(uk + wk),
+
+where uk are the applied controls and wk is zero-mean white noise. Imagine that the constraint
+gk(x, u) ≤ 0 deﬁnes circular obstacles O ⊂ Rd and control norm bounds deﬁned as
+
+ro − (cid:107)p − po(cid:107) ≤ 0,
+
+(cid:107)u(cid:107) ≤ umax,
+
+where ro is the radius of an obstacle at position po ∈ Rd. The cost J could be arbitrary but a
+typical choice is L(x, u) = 1
+R + q(x) where R > 0 is a given matrix and q(x) is a nonlinear
+function deﬁning a task. The ﬁnal cost could force the system towards a goal state xf ∈ Rn (or a
+region Xf ⊂ Rn) and could be deﬁned according to LN (x) = 1
+for some given matrix
+Qf ≥ 0. For such simple systems one can choose a smooth feedback control law uk = Φk(x)ξ with
+static positive gains ξ = (kp, kd, ko) ∈ R3 and basis function
+
+2(cid:107)x − xf(cid:107)2
+
+2(cid:107)u(cid:107)2
+
+Qf
+
+Φ(x) = [ pf − p
+
+vf − v ϕ(x,O) ] ,
+
+where ϕ(x,O) is an obstacle-avoidance force, e.g. deﬁned as the gradient of a potential ﬁeld or as a
+gyroscopic “steering” force ϕ(x,O) = s(x,O) × v that effectively rotates the velocity vector [22] .
+Alternatively, one could employ a time-varying optimal control law as described in §3.
+
+3
+
+4 PAC Bounds for Iterative Policy Adaptation
+We next compute probabilistic bounds on the expected cost J (ν) resulting from the execution of
+a new stochastic policy with hyper-parameters ν using observed samples from previous policies
+ν0, ν1, . . . . The bound is agnostic to how the policy is updated (i.e. Step 2 in the ISPO algorithm).
+
+4.1 A concentration-of-measure inequality for policy adaptation
+The stochastic optimization setting naturally allows the use of a prior belief ξ ∼ π(·|ν0) on what
+good control laws could be, for some known ν0 ∈ V. After observing M executions based on such
+prior, we wish to ﬁnd a new improved policy π(·|ν) which optimizes the cost
+π(ξ|ν)
+π(ξ|ν0)
+
+(cid:20)
+J (ν) (cid:44) Eτ,ξ∼p(·|ν)[J(τ )] = Eτ,ξ∼p(·|ν0)
+(cid:21)
+
+which can be approximated using samples ξj ∼ π(ξ|ν0) and τj ∼ p(τ|ξj) by the empirical cost
+
+J(τ )
+
+(cid:21)
+
+(2)
+
+,
+
+(cid:20)
+M(cid:88)
+
+j=1
+
+1
+M
+
+J(τj)
+
+π(ξj|ν)
+π(ξj|ν0)
+
+.
+
+(3)
+
+The goal is to compute the parameters ν using the sampled decision variables ξj and the corre-
+sponding observed costs J(τj). Obtaining practical bounds for J (ν) becomes challenging since the
+change-of-measure likelihood ratio π(ξ|ν)
+π(ξ|ν0) can be unbounded (or have very large values) [23] and a
+standard bound, e.g. such as Hoeffding’s or Bernstein’s becomes impractical or impossible to apply.
+To cope with this we will employ a recently proposed robust estimation [24] technique stipulating
+that instead of estimating the expectation m = E[X] of a random variable X ∈ [0,∞) using its
+j=1 Xj, a more robust estimate can be obtained by truncating its higher
+
+(cid:80)M
+empirical mean (cid:98)m = 1
+moments, i.e. using (cid:98)mα (cid:44) 1
+
+j=1 ψ(αXj) for some α > 0 where
+
+(cid:80)M
+
+αM
+
+M
+
+1
+2
+
+x2).
+
+ψ(x) = log(1 + x +
+
+(4)
+What makes this possible is the key assumption that the (possibly unbounded) random variable must
+have bounded second moment. We employ this idea to deal with the unboundedness of the policy
+adaptation ratio by showing that in fact its second moment can be bounded and corresponds to an
+information distance between the current and previous stochastic policies.
+To obtain sharp bounds though it is useful to employ samples over multiple iterations of the ISPO
+algorithm, i.e. from policies ν0, ν1, . . . , νL−1 computed in previous iterations. To simplify notation
+let z = (τ, ξ) and deﬁne (cid:96)i(z, ν) (cid:44) J(τ ) π(ξ|ν)
+π(ξ|νi). The cost (2) of executing ν can now be equivalently
+expressed as
+
+L−1(cid:88)
+
+J (ν) ≡ 1
+L
+
+Ez∼p(·|νi)(cid:96)i(z, ν)
+
+using the computed policies in previous iterations i = 0, . . . , L − 1. We next state the main result:
+Proposition 1. With probability 1 − δ the expected cost of executing a stochastic policy with pa-
+rameters ξ ∼ π(·|ν) is bounded according to:
+
+i=0
+
+(cid:41)
+
+1
+
+αLM
+
+log
+
+1
+δ
+
+,
+
+(5)
+
+α>0
+
+α
+2L
+
+J (ν) ≤ inf
+
+(cid:40)(cid:98)Jα(ν) +
+(cid:98)Jα(ν) (cid:44) 1
+
+L−1(cid:88)
+i eD2(π(·|ν)||π(·|νi)) +
+b2
+where (cid:98)Jα(ν) denotes a robust estimator deﬁned by
+M(cid:88)
+L−1(cid:88)
+(cid:90)
+
+ψ (α(cid:96)(zij, ν)) ,
+
+αLM
+
+j=1
+
+i=0
+
+i=0
+
+Dβ(p||q) =
+
+1
+
+β − 1
+
+log
+
+pβ(x)
+qβ−1(x)
+
+dx.
+
+The constants bi are such that 0 ≤ J(τ ) ≤ bi at each iteration i = 0, . . . , L − 1.
+
+computed after L iterations, with M samples zi1, . . . , ziM ∼ p(·|νi) obtained at iterations i =
+0, . . . , L − 1, where Dβ(p||q) denotes the Renyii divergence between p and q deﬁned by
+
+4
+
+Proof. The bound is obtained by relating the mean to its robust estimate according to
+
+,
+
+e
+
+i=0
+
+= e−αt+αLMJ E
+
+(cid:17)
+P(cid:16)
+LM (J (ν) − (cid:98)Jα(ν)) ≥ t
+eαLM (J (ν)−(cid:98)Jα(ν)) ≥ eαt(cid:17)
+= P(cid:16)
+eαLM (J (ν)−(cid:98)Jα(ν))(cid:105)
+≤ E(cid:104)
+= e−αt+αLMJ (ν)E(cid:104)
+j=1 −ψ(α(cid:96)i(zij ,ν))(cid:105)
+e−αt,
+(cid:80)M
+(cid:80)L−1
+L−1(cid:89)
+
+M(cid:89)
+= e−αt+αLMJ L−1(cid:89)
+M(cid:89)
+L−1(cid:89)
+M(cid:89)
+M(cid:89)
+L−1(cid:89)
+≤ e−αt+αLMJ (ν)
+(cid:80)L−1
+
+= e−αt+αLMJ (ν)
+
+e−ψ(α(cid:96)i(zij ,ν))
+
+1 − αJ (ν) +
+
+e−αJ (ν)+ α2
+
+2
+
+E z∼p(·|νi)
+
+(cid:18)
+
+α2
+2
+
+i=0
+
+j=1
+
+i=0
+
+j=1
+
+i=0
+
+j=1
+
+i=0
+
+j=1
+
+≤ e−αt+M α2
+
+2
+
+Ez∼p(·|νi)[(cid:96)i(z,ν)2],
+
+i=0
+
+(cid:20)
+
+1 − α(cid:96)i(z, ν) +
+
+(cid:21)
+
+α2
+2
+
+(cid:96)i(z, ν)2
+
+(cid:19)
+
+E z∼p(·|νi)[(cid:96)i(z, ν)2]
+
+Ez∼p(·|νi)[(cid:96)i(z,ν)2]
+
+(6)
+
+(7)
+
+(8)
+
+using Markov’s inequality to obtain (6), the identities ψ(x) ≥ − log(1 − x + 1
+2 x2) in (7) and
+1 + x ≤ ex in (8). Here, we adapted the moment-truncation technique proposed by Catoni [24] for
+general unbounded losses to our policy adaptation setting in order to handle the possibly unbounded
+likelihood ratio. These results are then combined with
+
+E [(cid:96)i(z, ν)2] ≤ b2
+
+i
+
+Eπ(·|νi)
+
+= b2
+
+i eD2(π||πi),
+
+(cid:21)
+
+(cid:20) π(ξ|ν)2
+
+π(ξ|νi)2
+
+where the relationship between the likelihood ratio variance and the Renyii divergence was estab-
+lished in [23].
+
+Note that the Renyii divergence can be regarded as a distance between two distribution and can be
+computed in closed bounded form for various distributions such as the exponential families; it is
+also closely related to the Kullback-Liebler (KL) divergence, i.e. D1(p||q) = KL(p||q).
+
+Illustration using simple robot navigation
+
+4.2
+We next illustrate the application of these bounds using the simple scenario introduced in §3. The
+stochasticity is modeled using a Gaussian density on the initial state p(x0), on the disturbances wk
+and on the goal state xf . Iterative policy optimization is performed using a stochastic model π(ξ|ν)
+encoding a multivariate Gaussian, i.e.
+
+π(ξ|ν) = N (ξ|µ, Σ)
+
+which is updated through reward-weighted-regression (RWR) [3], i.e. in Step 2 of the ISPO algo-
+rithm we take M samples, observe their costs, and update the parameters according to
+
+µ =
+
+¯w(τj)ξj,
+
+Σ =
+
+j=1
+
+j=1
+
+¯w(τj)(ξj − µ)(ξj − µ)T ,
+
+(9)
+
+using the tilting weights w(τ ) = e−βJ(τ ) for some adaptively chosen β > 0 and where ¯w(τj) (cid:44)
+
+M(cid:88)
+
+M(cid:88)
+
+w(τj)/(cid:80)M
+
+(cid:96)=1 w(τ(cid:96)) are the normalized weights.
+
+At each iteration i one can compute a bound on the expected cost using the previously computed
+ν0, . . . , νi−1. We have computed such bounds using (5) for both the expected cost and probability of
+
+5
+
+iteration #1
+
+iteration #4
+
+iteration #9
+
+iteration #28
+
+a)
+
+Figure 1: Robot navigation scenario based on iterative policy improvement and resulting predicted perfor-
+mance: a) evolution of the density p(ξ|ν) over the decision variables (in this case the control gains); b) cost
+function J and its computed upper bound J + for future executions; c) analogous bounds on probability-of-
+collision P ; snapshots of sampled trajectories (top). Note that the initial policy results in ≈ 30% collisions.
+Surprisingly, the standard empirical and robust estimates are nearly identical.
+
+b)
+
+c)
+
+collision, denoted respectively by J + and P + using M = 200 samples (Figure 1) at each iteration.
+We used a window of maximum L = 10 previous iterations to compute the bounds, i.e. to compute
+νi+1 all samples from densities νi−L+1, νi−L+2, . . . , νi were used. Remarkably, using our robust
+statistics approach the resulting bound eventually becomes close to the standard empirical estimate
+
+(cid:98)J . The collision probability bound P + decreses to less than 10% which could be further improved
+
+by employing more samples and more iterations. The signiﬁcance of these bounds is that one can
+stop the optimization (regarded as training) at any time and be able to predict expected performance
+in future executions using the newly updated policy before actually executing the policy, i.e. using
+the samples from the previous iteration.
+Finally, the Renyii divergence term used in these computations takes the simple form
+
+Dβ (N (·|µ0, Σ0)(cid:107)N (·|µ1, Σ1)) =
+
+β
+2
+
+where Σβ = (1 − β)Σ0 + βΣ1.
+
+(cid:107)µ1 − µ0(cid:107)2
+
+−1
+β
+
+Σ
+
++
+
+1
+
+2(1 − β)
+
+log
+
+|Σβ|
+
+|Σ0|1−β|Σ1|β ,
+
+4.3 Policy Optimization Methods
+We do not impose any restrictions on the speciﬁc method used for optimizing the policy π(ξ|ν).
+When complex constraints are present such computation will involve a global motion planning step
+combined with local feedback control laws (we show such an example in §5). The approach can
+be used to either analyze such policies computed using any method of choice or to derive new
+algorithms based on minimizing the right-hand side of the bound. The method also applies to model-
+free learning. For instance, related to recent methods in robotics one could use reward-weighted-
+regression (RWR) or policy learning by weighted samples with returns (PoWeR) [3], stochastic
+optimization methods such as [25, 26], or using the related cross-entropy optimization [16, 27].
+
+6
+
+-15-10-505-15-10-505-15-10-505-15-10-505-15-10-505-15-10-505obstaclesgoalsampledstartstatesobstaclesiterations051015202530012345678ExpectedCostempiricalbJrobustbJαPACboundJ+iterations05101520253000.10.20.30.40.50.60.7ProbabilityofCollisionempiricalProbustPαPACboundP+5 Application to Aerial Vehicle Navigation
+Consider an aerial vehicle such as a quadrotor navigating at high speed through a cluttered environ-
+ment. We are interested in minimizing a cost metric related to the total time taken and control effort
+required to reach a desired goal state, while maintaining low probability of collision. We employ an
+experimentally identiﬁed model of an AscTec quadrotor (Figure 2) with 12-dimensional state space
+X = SE(3) × R6 with state x = (p, R, ˙p, ω) where p ∈ R3 is the position, R ∈ SO(3) is the
+rotation matrix, and ω ∈ R3 is the body-ﬁxed angular velocity. The vehicle is controlled with inputs
+u = (F, M ) ∈ R4 including the lift force F ≥ 0 and torque moments M ∈ R3. The dynamics is
+
+˙R = R(cid:98)ω,
+
+J ˙ω = Jω × ω + M,
+
+m¨p = Re3F + mg + δ(p, ˙p),
+
+where m is the mass, J–the inertia tensor, e3 = (0, 0, 1) and the matrix(cid:98)ω is such that(cid:98)ωη = ω × η
+
+(10)
+(11)
+(12)
+for any η ∈ R3. The system is subject to initial localization errors and also to random disturbances,
+e.g. due to wind gusts and wall effects, deﬁned as stochastic forces δ(p, ˙p) ∈ R3. Each component
+in δ is zero-mean and has standard deviation of 3 Newtons, for a vehicle with mass m ≈ 1 kg.
+The objective is to navigate through a given urban environment at high speed to a desired goal
+state. We employ a two-stage approach consisting of an A*-based global planner which produces
+a sequence of local sub-goals that the vehicle must pass through. A standard nonlinear feedback
+backstepping controller based on a “slow” position control loop and a “fast” attitude control is
+employed [28, 29] for local control. In addition, and obstacle avoidance controller is added to avoid
+collisions since the vehicle is not expected to exactly follow the A* path. At each iteration M = 200
+samples are taken with 1 − δ = 0.95 conﬁdence level. A window of L = 5 past iterations were
+used for the bounds. The control density π(ξ|ν) is a single Gaussian as speciﬁed in §4.2. The most
+sensitive gains in the controller are the position proporitional and derivative terms, and the obstacle
+gains, denoted by kp, kd, and ko, which we examine in the following scenarios:
+a) ﬁxed goal, wind gusts disturbances, virtual environment: the system is ﬁrst tested in a cluttered
+simulated environment (Figure 2). The simulated vehicle travels at an average velocity of 20
+m/s (see video in Supplement) and initially experiences more than 50% collisions. After a few
+iterations the total cost stabilizes and the probability of collision reduces to around 15%. The
+bound is close to the empirical estimate which indicates that it can be tight if more samples are
+taken. The collision probability bound is still too high to be practical but our goal was only
+to illustrate the bound behavior. It is also likely that our chosen control strategy is in fact not
+suitable for high-speed traversal of such tight environments.
+
+b) sparser campus-like environment, randomly sampled goals: a more general evaluation was per-
+formed by adding the goal location to the stochastic problem parameters so that the bound will
+apply to any future desired goal in that environment (Figure 3). The algorithm converges to
+similar values as before, but this time the collision probability is smaller due to more expan-
+sive environment. In both cases, the bounds could be reduced further by employing more than
+M = 200 samples or by reusing more samples from previous runs according to Proposition 1.
+
+6 Conclusion
+This paper considered stochastic decision problems and focused on a probably-approximate bounds
+on robustness of the computed decision variables. We showed how to derive bounds for ﬁxed poli-
+cies in order to predict future performance and/or constraint violation. These results could then be
+employed for obtaining generalization PAC bounds, e.g. through a PAC-Bayesian approach which
+could be consistent with the proposed notion of policy priors and policy adaptation. Future work
+will develop concrete algorithms by directly optimizing such PAC bounds, which are expected to
+have built-in robustness properties.
+References
+[1] Richard S. Sutton, David A. McAllester, Satinder P. Singh, and Yishay Mansour. Policy gradient methods
+
+for reinforcement learning with function approximation. In NIPS, pages 1057–1063, 1999.
+
+[2] Csaba Szepesvari. Algorithms for Reinforcement Learning. Morgan and Claypool Publishers, 2010.
+[3] M. P. Deisenroth, G. Neumann, and J. Peters. A survey on policy search for robotics. pages 388–403,
+
+2013.
+
+7
+
+Figure 2: Aerial vehicle navigation using a simulated nonlinear quadrotor model (top). Iterative stochastic
+policy optimization iterations (a,b,c) analogous to those given in Figure 1. Note that the initial policy results in
+over 50% collisions which is reduced to less than 10% after a few policy iterations.
+
+b)
+
+c)
+
+Figure 3: Analogous plot to Figure 2 but for a typical campus environment using uniformly at random sampled
+goal states along the northern boundary. The vehicle must ﬂy below 100 feet and is not allowed to ﬂy above
+buildings. This is a larger less constrained environment resulting in less collisions.
+
+c)
+
+a)
+
+a)
+
+b)
+
+8
+
+iteration#1iteration#5iteration#17A*waypointpathsimulatedquadrotormotionAscTecPelicaniterations0510152025050100150200250300350ExpectedCostempiricalbJrobustbJαPACboundJ+iterations051015202500.20.40.60.81ProbabilityofCollisionempiricalProbustPαPACboundP+iteration#1iteration#4iteration#10campusmapStartrandomGoalsiterations051015050100150200250300350400ExpectedCostempiricalbJrobustbJαPACboundJ+iterations05101500.20.40.60.81ProbabilityofCollisionempiricalProbustPαPACboundP+[4] S. Schaal and C. Atkeson. Learning control in robotics. Robotics Automation Magazine, IEEE, 17(2):20
+
+–29, june 2010.
+
+[5] Alberto Bemporad and Manfred Morari. Robust model predictive control: A survey. In A. Garulli and
+A. Tesi, editors, Robustness in identiﬁcation and control, volume 245 of Lecture Notes in Control and
+Information Sciences, pages 207–226. Springer London, 1999.
+
+[6] Vladimir N. Vapnik. The nature of statistical learning theory. Springer-Verlag New York, Inc., New York,
+
+NY, USA, 1995.
+
+[7] David A. McAllester. Pac-bayesian stochastic model selection. Mach. Learn., 51:5–21, April 2003.
+[8] J Langford. Tutorial on practical prediction theory for classiﬁcation. Journal of Machine Learning Re-
+
+search, 6(1):273–306, 2005.
+
+[9] Stphane Boucheron, Gbor Lugosi, Pascal Massart, and Michel Ledoux. Concentration inequalities : a
+
+nonasymptotic theory of independence. Oxford university press, Oxford, 2013.
+
+[10] M. Vidyasagar. Randomized algorithms for robust controller synthesis using statistical learning theory.
+
+Automatica, 37(10):1515–1528, October 2001.
+
+[11] Laura Ryan Ray and Robert F. Stengel. A monte carlo approach to the analysis of control system robust-
+
+ness. Automatica, 29(1):229–236, January 1993.
+
+[12] Qian Wang and RobertF. Stengel. Probabilistic control of nonlinear uncertain systems.
+
+In Giuseppe
+Calaﬁore and Fabrizio Dabbene, editors, Probabilistic and Randomized Methods for Design under Un-
+certainty, pages 381–414. Springer London, 2006.
+
+[13] R. Tempo, G. Calaﬁore, and F. Dabbene. Randomized algorithms for analysis and control of uncertain
+
+systems. Springer, 2004.
+
+[14] V. Koltchinskii, C.T. Abdallah, M. Ariola, and P. Dorato. Statistical learning control of uncertain systems:
+¡ce:title¿The
+
+theory and algorithms. Applied Mathematics and Computation, 120(13):31 – 43, 2001.
+Bellman Continuum¡/ce:title¿.
+
+[15] M. Vidyasagar and Rajeeva L. Karandikar. A learning theory approach to system identiﬁcation and
+stochastic adaptive control. Journal of Process Control, 18(34):421 – 430, 2008. Festschrift honour-
+ing Professor Dale Seborg.
+
+[16] Reuven Y. Rubinstein and Dirk P. Kroese. The cross-entropy method: a uniﬁed approach to combinatorial
+
+optimization. Springer, 2004.
+
+[17] Anatoly Zhigljavsky and Antanasz Zilinskas. Stochastic Global Optimization. Spri, 2008.
+[18] Philipp Hennig and Christian J. Schuler. Entropy search for information-efﬁcient global optimization. J.
+
+Mach. Learn. Res., 98888:1809–1837, June 2012.
+
+[19] Christian Igel, Nikolaus Hansen, and Stefan Roth. Covariance matrix adaptation for multi-objective
+
+optimization. Evol. Comput., 15(1):1–28, March 2007.
+
+[20] Pedro Larraaga and Jose A. Lozano, editors. Estimation of distribution algorithms: A new tool for evolu-
+
+tionary computation. Kluwer Academic Publishers, 2002.
+
+[21] Martin Pelikan, David E. Goldberg, and Fernando G. Lobo. A survey of optimization by building and
+
+using probabilistic models. Comput. Optim. Appl., 21:5–20, January 2002.
+
+[22] Howie Choset, Kevin M. Lynch, Seth Hutchinson, George A Kantor, Wolfram Burgard, Lydia E. Kavraki,
+and Sebastian Thrun. Principles of Robot Motion: Theory, Algorithms, and Implementations. MIT Press,
+June 2005.
+
+[23] Corinna Cortes, Yishay Mansour, and Mehryar Mohri. Learning Bounds for Importance Weighting. In
+
+Advances in Neural Information Processing Systems 23, 2010.
+
+[24] Olivier Catoni. Challenging the empirical mean and empirical variance: A deviation study. Ann. Inst. H.
+
+Poincar Probab. Statist., 48(4):1148–1185, 11 2012.
+
+[25] E. Theodorou, J. Buchli, and S. Schaal. A generalized path integral control approach to reinforcement
+
+learning. Journal of Machine Learning Research, (11):3137–3181, 2010.
+
+[26] Sergey Levine and Pieter Abbeel. Learning neural network policies with guided policy search under
+
+unknown dynamics. In Neural Information Processing Systems (NIPS), 2014.
+
+[27] M. Kobilarov. Cross-entropy motion planning. International Journal of Robotics Research, 31(7):855–
+
+871, 2012.
+
+[28] Robert Mahony and Tarek Hamel. Robust trajectory tracking for a scale model autonomous helicopter.
+
+International Journal of Robust and Nonlinear Control, 14(12):1035–1059, 2004.
+
+[29] Marin Kobilarov. Trajectory tracking of a class of underactuated systems with external disturbances. In
+
+American Control Conference, pages 1044–1049, 2013.
+
+9
+
+

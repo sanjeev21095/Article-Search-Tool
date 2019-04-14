@@ -1,0 +1,745 @@
+Basis Reﬁnement Strategies for Linear Value
+
+Function Approximation in MDPs
+
+Gheorghe Comanici
+
+Doina Precup
+
+School of Computer Science
+
+School of Computer Science
+
+Prakash Panangaden
+
+School of Computer Science
+
+McGill University
+Montreal, Canada
+
+McGill University
+Montreal, Canada
+
+McGill University
+Montreal, Canada
+
+gcoman@cs.mcgill.ca
+
+dprecup@cs.mcgill.ca
+
+prakash@cs.mcgill.ca
+
+Abstract
+
+We provide a theoretical framework for analyzing basis function construction for
+linear value function approximation in Markov Decision Processes (MDPs). We
+show that important existing methods, such as Krylov bases and Bellman-error-
+based methods are a special case of the general framework we develop. We pro-
+vide a general algorithmic framework for computing basis function reﬁnements
+which “respect” the dynamics of the environment, and we derive approximation
+error bounds that apply for any algorithm respecting this general framework. We
+also show how, using ideas related to bisimulation metrics, one can translate ba-
+sis reﬁnement into a process of ﬁnding “prototypes” that are diverse enough to
+represent the given MDP.
+
+1
+
+Introduction
+
+Finding optimal or close-to-optimal policies in large Markov Decision Processes (MDPs) requires
+the use of approximation. A very popular approach is to use linear function approximation over a set
+of features [Sutton and Barto, 1998, Szepesvari, 2010]. An important problem is that of determining
+automatically this set of features in such a way as to obtain a good approximation of the problem
+at hand. Many approaches have been explored, including adaptive discretizations [Bertsekas and
+Castanon, 1989, Munos and Moore, 2002], proto-value functions [Mahadevan, 2005], Bellman error
+basis functions (BEBFs) [Keller et al., 2006, Parr et al., 2008a], Fourier basis [Konidaris et al.,
+2011], feature dependency discovery [Geramifard et al., 2011] etc. While many of these approaches
+have nice theoretical guarantees when constructing features for ﬁxed policy evaluation, this problem
+is signiﬁcantly more difﬁcult in the case of optimal control, where multiple policies have to be
+evaluated using the same representation.
+We analyze this problem by introducing the concept of basis reﬁnement, which can be used as a gen-
+eral framework that encompasses a large class of iterative algorithms for automatic feature extrac-
+tion. The main idea is to start with a set of basis which are consistent with the reward function, i.e.
+which allow only states with similar immediate reward to be grouped together. One-step look-ahead
+is then used to ﬁnd parts of the state space in which the current basis representation is inconsistent
+with the environment dynamics, and the basis functions are adjusted to ﬁx this problem. The process
+continues iteratively. We show that BEBFs [Keller et al., 2006, Parr et al., 2008a] can be viewed as
+a special case of this iterative framework. These methods iteratively expand an existing set of basis
+functions in order to capture the residual Bellman error. The relationship between such features and
+augmented Krylov bases allows us to show that every additional feature in these sets is consistently
+reﬁning intermediate bases. Based on similar arguments, it can be shown that other methods, such
+as those based on the concept of MDP homomorphisms [Ravindran and Barto, 2002], bisimulation
+metrics [Ferns et al., 2004], and partition reﬁnement algorithms [Ruan et al., 2015], are also spe-
+cial cases of the framework. We provide approximation bounds for sequences of reﬁnements, as
+
+1
+
+well as a basis convergence criterion, using mathematical tools rooted in bisimulation relations and
+metrics [Givan et al., 2003, Ferns et al., 2004].
+A ﬁnal contribution of this paper is a new approach for computing alternative representations based
+on a selection of prototypes that incorporate all the necessary information to approximate values
+over the entire state space. This is closely related to kernel-based approaches [Ormoneit and Sen,
+2002, Jong and Stone, 2006, Barreto et al., 2011], but we do not assume that a metric over the state
+space is provided (which allows one to determine similarity between states). Instead, we use an
+iterative approach, in which prototypes are selected to properly distinguish dynamics according to
+the current basis functions, then a new metric is estimated, and the set of prototypes is reﬁned again.
+This process relies on using pseudometrics which in the limit converge to bisimulation metrics.
+
+2 Background and notation
+
+We will use the framework of Markov Decision Processes, consisting of a ﬁnite state space S, a
+ﬁnite action space A, a transition function P : (S × A) → P(S)1, where P (s, a) is a probability
+distribution over the state space S, a reward function2 R : (S×A) → R. For notational convenience,
+P a(s), Ra(s) will be used to denote P (s, a) and R(s, a), respectively. One of the main objectives
+of MDP solvers is to determine a good action choice, also known as a policy, from every state that
+the system would visit. A policy π : S → P(A) determines the probability of choosing each action
+a∈A π(s)(a) = 1). The value of a policy π given a state s0 is deﬁned as
+
+a given the state s (with(cid:80)
+
+i=0 γiRai(si)(cid:12)(cid:12) si+1 ∼ P ai(si), ai ∼ π(si)(cid:3) .
+
+V π(s0) = E(cid:2)(cid:80)∞
+
+(cid:2)EP a(s)[f ](cid:3). Let
+
+Note that V π is a real valued function [[S → R]]; the space of all such functions will be denoted
+by FS. We will also call such functions features. Let Rπ and P π denote the reward and tran-
+sition probabilities corresponding to choosing actions according to π. Note that Rπ ∈ FS and
+P π ∈ [[FS → FS]], where3 Rπ(s) = Ea∼π(s)[Ra(s)] and P π(f )(s) = Ea∼π(s)
+T π ∈ [[FS → FS]] denote the Bellman operator: T π(f ) = Rπ + γP π(f ). This operator is linear
+and V π is its ﬁxed point, i.e. T π(V π) = V π. Most algorithms for solving MDPs will either use
+the model (Rπ, P π) to ﬁnd V π (if this model is available and/or can be estimated efﬁciently), or
+they will estimate V π directly using samples of the model, {(si, ai, ri, si+1)}∞
+i=0. The value V ∗
+associated with the best policy π∗ is the ﬁxed point of the Bellman optimality operator T ∗ (not a
+linear operator), deﬁned as: T ∗(f ) = maxa∈A (Ra + γP a(f )).
+The main problem we address in this paper is that of ﬁnding alternative representations for a given
+MDP. In particular, we look for ﬁnite, linearly independent subsets Φ of FS. These are bases for sub-
+spaces that will be used to speed up the search for V π, by limiting it to span(Φ). We say that a basis
+B is a partition if there exists an equivalence relation ∼ on S such that B = {χ(C) | C ∈ S/∼},
+where χ is the characteristic function (i.e. χ(X)(x) = 1 if x ∈ X and 0 otherwise). Given any
+equivalence relation ∼, we will use the notation ∆(∼) for the set of characteristic functions on the
+equivalence classes of ∼, i.e. ∆(∼) = {χ(C) | C ∈ S/∼}.4.
+Our goal will be to ﬁnd subsets Φ ⊂ FS which allow a value function approximation with strong
+quality guarantees. More precisely, for any policy π we would like to approximate V π with
+i=1 wiφi for some choice of wi’s, which amounts to ﬁnding the best candidate inside
+V π
+the space spanned by Φ = {φ1, φ2, ..., φk}. A sufﬁcient condition for V π to be an element of
+span(Φ) (and therefore representable exactly using the chosen set of bases), is for Φ to span
+the reward function and be an invariant subspace of the transition function: Rπ ∈ span(Φ) and
+∀f ∈ Φ, P π(f ) ∈ span(Φ). Linear ﬁxed point methods like TD, LSTD, LSPE [Sutton, 1988,
+Bradtke and Barto, 1996, Yu and Bertsekas, 2006] can be used to ﬁnd the least squares ﬁxed point
+approximation V π
+Φ of V π for a representation Φ; these constitute proper approximation schemes, as
+
+Φ = (cid:80)k
+
+1We will use P(X) to denote the set of probability distributions on a given set X.
+2For simplicity, we assume WLOG that the reward is deterministic and independent of the state into which
+
+the system arrives.
+
+3We will use Eµ[f ] = (cid:80)
+function f is multivariate, we will use Ex∼µ[f (x, y)] =(cid:80)
+
+x f (x)µ(x) to mean the expectation of a function f wrt distribution µ. If the
+x f (x, y)µ(x) to denote expectation of f when y is
+4The equivalence class of an element s ∈ S is {s(cid:48) ∈ S | s ∼ s(cid:48)}. S/∼ is used for the quotient set of all
+
+ﬁxed.
+equivalence classes of ∼.
+
+2
+
+Φ, P π
+
+Φ is the ﬁxed point of the operator T π
+
+Φ (f ) = ΠΦRπ + γΠΦP π(f ) and V π
+
+one can determine the number of iterations required to achieve a desired approximation error. Given
+a representation Φ, the approximate value function V π
+Φ, deﬁned
+Φ f := ΠΦ(Rπ + γP π(f )), where ΠΦ is the orthogonal projection operator on Φ. Using the
+as: T π
+linearity of ΠΦ, it directly follows that T π
+Φ is the ﬁxed point of
+Φ ) := (ΠΦRπ, ΠΦP π). For more
+the Bellman operator over the transformed linear model (Rπ
+details, see [Parr et al., 2008a,b].
+The analysis tools that we will use to establish our results are based on probabilistic bisimulation and
+its quantitative analogues. Strong probabilistic bisimulation is a notion of behavioral equivalence
+between the states of a probabilistic system, due to [Larsen and Skou, 1991] and applied to MDPs
+with rewards by [Givan et al., 2003]. The metric analog is due to [Desharnais et al., 1999, 2004] and
+the extension of the metric to include rewards is due to [Ferns et al., 2004]. An equivalence relation
+∼ is a a bisimulation relation on the state space S if for every pair (s, s(cid:48)) ∈ S×S, s ∼ s(cid:48) if and only
+if ∀a ∈ A,∀C ∈ S/∼, Ra(s) = Ra(s(cid:48)) and P a(s)(C) = P a(s(cid:48))(C) (we use here P a(s)(C) to de-
+note the probability of transitioning into C, under transition s, a). A pseudo-metric is a bisimulation
+metric if there exists some bisimulation relation ∼ such that ∀s, s(cid:48), d(s, s(cid:48)) = 0 ⇐⇒ s ∼ s(cid:48).
+The bisimulation metrics described by [Ferns et al., 2004] are constructed using the Kantorovich
+metric for comparing two probability distributions. Given a ground metric d over S, the Kantorovich
+metric over P(S) takes the largest difference in the expected value of Lipschitz-1 functions with
+respect to d: Ω(d) := {f ∈ FS | ∀s, s(cid:48), f (s) − f (s(cid:48)) ≤ d(s, s(cid:48))}. The distance between two
+probabilities µ and ν is computed as: K(d) : (µ, ν) (cid:55)→ supϕ∈Ω(d)
+Eµ[ϕ] − Eν[ϕ]. For more details
+on the Kantorovich metric, see [Villani, 2003]. The following approximation scheme converges to
+a bisimulation metric (starting with d0 = 0, the metric that associates 0 to all pairs):
+dk+1(s, s(cid:48)) = T (dk)(s, s(cid:48)) := max
+(1)
+The operator T has a ﬁxed point d∗, which is a bisimulation metric, and dk → d∗ as k → ∞. [Ferns
+et al., 2004] provide bounds which allow one to assess the quality of general state aggregations using
+this metric. Given a relation ∼ and its corresponding partition ∆(∼), one can deﬁne an MDP model
+over ∆(∼) as: ˆRa = Π∆(∼)Ra and ˆP a = Π∆(∼)P a, ∀a ∈ A. The approximation error between the
+true MDP optimal value function V ∗ and its approximation using this reduced MDP model, denoted
+by V ∗
+
+(cid:0)(1 − γ)(cid:12)(cid:12)Ra(s) − Ra(s(cid:48))(cid:12)(cid:12) + γK(dk)(cid:0)P a(s), P a(s(cid:48))(cid:1)(cid:1).
+
+∆(∼), is bounded above by:
+
+a
+
+(2)
+∼(s) is average distance from a state s to its ∼-equivalence class, deﬁned as an expectation
+where d∗
+over the uniform distribution U: d∗
+∼(s) = Eˆs∼U [d∗(s, ˆs) | s ∼ ˆs]. Similar bounds for representa-
+tions that are not partitions can be found in [Comanici and Precup, 2011]. Note that these bounds
+are minimized by aggregating states which are “close” in terms of the bisimulation distance d∗.
+
+1 − γ
+
+d∗
+∼(s) + max
+s(cid:48)∈S
+
+γ
+
+(1 − γ)2 d∗
+
+∼(s(cid:48)).
+
+(cid:12)(cid:12)(cid:12)V ∗
+
+∆(∼)(s) − V ∗(s)
+
+(cid:12)(cid:12)(cid:12) ≤ 1
+
+3 Basis reﬁnement
+
+In this section we describe the proposed basis reﬁnement framework, which relies on “detecting”
+and “ﬁxing” inconsistencies in the dynamics induced by a given set of features. Intuitively, states
+are dynamically consistent with respect to a set of basis functions if transitions out of these states
+are evaluated the same way by the model {P a | a ∈ A}. Inconsistencies are “ﬁxed” by augmenting
+a basis with features that are able to distinguish inconsistent states, relative to the initial basis. We
+are now ready to formalize these ideas.
+Deﬁnition 3.1. Given a subset F ⊂ FS, two states s, s(cid:48) ∈ S are consistent with respect to F ,
+denoted s ∼F s(cid:48), if ∀f ∈ F,∀a ∈ A, f (s) = f (s(cid:48)) and EP a(s)[f ] = EP a(s(cid:48))[f ].
+Deﬁnition 3.2. Given two subspaces F, G ⊂ FS, G reﬁnes F in an MDP M, and write F (cid:110) G, if
+F ⊆ G and
+
+∀s, s(cid:48) ∈ S, s ∼F s(cid:48) ⇐⇒ [∀g ∈ G, g(s) = g(s(cid:48))].
+
+Eµ[f ] = Eν[f ](cid:3) ⇐⇒
+(cid:2)∀b ∈ Γ, Eµ[b] = Eν[b](cid:3). For the special case of Dirac distributions δs and δs(cid:48), for which
+
+Using the linearity of expectation, one can prove that, given two probability distributions µ, ν,
+and a ﬁnite subset Γ ⊂ F ,
+
+then (cid:2)∀f ∈ F,
+
+if span(Γ) = F ,
+
+3
+
+Eδs[f ] = f (s), it also holds that(cid:2)∀f ∈ F,
+
+f (s) = f (s(cid:48))(cid:3) ⇐⇒ (cid:2)∀b ∈ Γ,
+
+b(s) = b(s(cid:48))(cid:3).
+
+Therefore, Def. 3.2 gives a relation between two subspaces, but the reﬁnement conditions could be
+checked on any basis choice. It is the subspace itself rather than a particular basis that matters, i.e.
+Γ (cid:110) Γ(cid:48) if span(Γ) (cid:110) span(Γ(cid:48)). To ﬁx inconsistencies on a pair (s, s(cid:48)), for which we can ﬁnd f ∈ Γ
+and a ∈ A such that either f (s) (cid:54)= f (s(cid:48)) or EP a(s)[f ] (cid:54)= EP a(s(cid:48))[f ], one should construct a new
+function ϕ with ϕ(s) (cid:54)= ϕ(s(cid:48)) and add it to Γ(cid:48). To guarantee that all inconsistencies have been
+addressed, if ϕ(s) (cid:54)= ϕ(s(cid:48)) for some ϕ ∈ Γ(cid:48), Γ must contain a feature f such that, for some a ∈ A,
+either f (s) (cid:54)= f (s(cid:48)) or EP a(s)[f ] (cid:54)= EP a(s(cid:48))[f ].
+In Sec. 5 we present an algorithmic framework consisting of sequential improvement steps, in which
+a current basis Γ is reﬁned into a new one, Γ(cid:48), with span(Γ) (cid:110) span(Γ(cid:48)). Def 3.2 guarantees that
+following such strategies expands span(Γ) and that the approximation error for any policy will be
+decreased as a result. We now discuss bounds that can be obtained based on these deﬁnitions.
+
+3.1 Value function approximation results
+
+(cid:111)
+
+b∈∆(∼Γ) ω(b)b
+
+(cid:2)∀b, b(cid:48) ∈ ∆(∼Γ), b (cid:54)= b(cid:48) ⇒ ω(b) (cid:54)= ω(b(cid:48))(cid:3) ⇒ Γ (cid:110) Γ ∪(cid:110)(cid:80)
+
+One simple way to create a reﬁnement is to add to Γ a single element that would address all incon-
+sistencies: a feature that is valued differently for every element of ∆(∼Γ). Given ω : ∆(∼Γ) → R,
+. On the other hand,
+such a construction provides no approximation guarantee for the optimal value function (unless we
+make additional assumptions on the problem - we will discuss this further in Section 3.2). Although
+it addresses inconsistencies in the dynamics over the set of features spanned by Γ, it does not nec-
+essarily provide the representation power required to properly approximate the value of the optimal
+policy. The main theoretical result in this section provides conditions for describing reﬁning se-
+quences of bases, which are not necessarily accurate, but have approximation errors bounded by
+an exponentially decreasing function. These results are based on ∆(∼Γ), the largest basis reﬁning
+subspace: any feature that is constant over equivalence classes of ∼Γ will be spanned by ∆(∼), i.e.
+for any reﬁnement V (cid:110) W , V ⊆ W ⊆ span(∆(∼V )). These subsets are convenient as they can be
+analyzed using the bisimulation metric introduced in [Ferns et al., 2004].
+Lemma 3.1. The bisimulation operator in Eq. 1) is a contraction with constant γ. That is, for any
+metric d over S, sups,s(cid:48)∈S |T (d)(s, s(cid:48))| ≤ γ sups,s(cid:48)∈S |d(s, s(cid:48))|.
+The proof relies on the Monge-Kantorovich duality (see [Villani, 2003]) to check that T satisﬁes
+sufﬁcient conditions to be a contraction operator. An operator Z is a contraction (with constant
+γ < 1) if Z(x) ≤ Z(x(cid:48)) whenever x ≤ x(cid:48), and if Z(x + c) = Z(x) + γc for any constant
+c ∈ R [Blackwell, 1965]. One could easily check these conditions on the operator in Equation 1.
+Theorem 3.1. Let ∼0 represent reward consistency, i.e. s ∼0 s(cid:48) ⇐⇒ ∀a ∈ A, Ra(s) = Ra(s(cid:48)),
+and Γ1 = ∆(∼0). Additionally, assume {Γn}∞
+n=1 is a sequence of bases such that for all n ≥ 1,
+Γn (cid:110) Γn+1 and Γn+1 is as large as the partition corresponding to consistency over Γn, i.e.
+|Γn+1| = |S/∼Γn |. If V ∗
+is the optimal value function computed with respect to representa-
+
+− V ∗(cid:12)(cid:12)(cid:12)(cid:12)∞ ≤ γn+1 sups,s(cid:48),a |Ra(s) − Ra(s(cid:48))|/(1 − γ)2.
+
+tion Γn, then(cid:12)(cid:12)(cid:12)(cid:12)V ∗
+
+Γn
+
+Γn
+
+n=1.
+
+Proof. We will use the bisimulation metric deﬁned in Eq. 1 and Eq. 2 applied to the special case of
+reduced models over bases {Γn}∞
+First, note that Monge-Kantorovich duality is crucial in this proof. It basically states that the Kan-
+torovich metric is a solution to the Monge-Kantorovich problem, when its cost function is equal
+to the base metric for the Kantorovich metric. Speciﬁcally, for two measures µ and ν, and a cost
+function f ∈ [S × S → R], the Monge-Kantorovich problem computes:
+J (f )(µ, ν) = inf{Eξ[f (x, y)] | ξ ∈ P(S× S) s.t. µ, ν are the marginals corresponding to x and y}
+The set of measures ξ with marginals µ and ν is also known as the set of couplings of µ and ν. For
+any metric d over S, J (d)(µ, ν) = K(d)(µ, ν) (for proof, see [Villani, 2003]).
+Next, we
+Since
+relation
+|Γn+1| = |S/∼Γn | = |∆(∼Γn )| and Γn+1 ⊆ span(∆(∼Γn )), it must be the case that
+span(Γn+1) = span(∆(∼Γn )).
+is not hard to see that for the special case of parti-
+tions, a reﬁnement can be determined based on transitions into equivalence classes. Given
+
+the metric
+
+and Γn.
+
+T n(0)
+
+describe
+
+between
+
+It
+
+a
+
+4
+
+two equivalence relations ∼1 and ∼2,
+the reﬁnement ∆(∼1) (cid:110) ∆(∼2) holds if and only if
+∀s, s(cid:48) with s ∼Γn+1 s(cid:48), and ∀C ∈ S/∼Γn , P a(s)(C) = P a(s(cid:48))(C). This equality is crucial in
+deﬁning the following coupling for J (f )(P a(s), P a(s(cid:48))): let ξC ∈ P(S × S) be any coupling of
+P a(s)|C and P a(s(cid:48))|C, the restrictions of P a(s) and P a(s(cid:48)) to C; the latter is possible as the two
+ξC. For any cost
+
+s ∼2 s(cid:48) ⇒ s ∼1 s(cid:48) and s ∼2 s(cid:48) ⇒(cid:2)∀a ∈ A,∀C ∈ S/∼1 P a(s)(C) = P a(s(cid:48))(C)(cid:3). In particular,
+distributions are equal. Next, deﬁne the coupling ξ of µ and ν as ξ =(cid:80)
+function f, if s ∼Γn+1 s(cid:48), then J (f )(P a(s), P a(s(cid:48))) ≤(cid:80)
+
+C∈S/∼Γn
+
+EξC [f ].
+
+Using an inductive argument, we will now show that ∀n, s ∼Γn s(cid:48) ⇒ T n(0)(s, s(cid:48)) = 0. The base
+case is clear from the deﬁnition: s ∼0 s(cid:48) ⇒ T (0)(s, s(cid:48)) = 0. Now, assume the former holds for n;
+that is, ∀C ∈ S/∼Γn , ∀s, s(cid:48) ∈ C,T n(0)(s, s(cid:48)) = 0. But ξC is zero everywhere except on the set
+C × C, so EξC [T n(0)] = 0. Combining the last two results, we get the following upper bound:
+
+s ∼Γn+1 s(cid:48) ⇒ J (T n(0))(P a(s), P a(s(cid:48))) ≤(cid:80)
+
+EξC [T n(0)] = 0.
+
+C∈S/∼Γn
+
+Since T n(0) is a metric, it also holds that J (T n(0))(P a(s), P a(s(cid:48))) ≥ 0. Moreover, as s and
+s(cid:48) are consistent over Γn ⊇ ∆(∼0), this pair of states agree on the reward function. Therefore,
+T n+1(0)(s, s(cid:48)) = maxa((1 − γ)|Ra(s) − Ra(s(cid:48))| + γJ (T n(0))(P a(s), P a(s(cid:48)))) = 0.
+Finally, for any b ∈ ∆(∼Γn ) and s ∈ S with b(s) = 1, and any other state ˆs with b(ˆs) = 1, it must
+be the case that s ∼Γn ˆs and T n(0)(s, ˆs) = 0. Therefore,
+
+C∈S/∼Γn
+
+(cid:12)(cid:12)(cid:12)(cid:12)V ∗
+
+ˆs∼U [d∗(s, ˆs) | s ∼Γn ˆs] = E
+E
+As span(Γn) = span(∆(∼n)), V ∗
+Based on (2) and (3), we can conclude that
+
+Γn
+
+(3)
+is the optimal value function for the MDP model over ∆(∼n).
+
+ˆs∼U [d∗(s, ˆs) − T n(0)(s, ˆs) | s ∼Γn ˆs] ≤ ||d∗ − T n(0)||∞.
+− V ∗(cid:12)(cid:12)(cid:12)(cid:12)∞ ≤ γ||d∗ − T n(0)||∞/(1 − γ)2.
+
+(4)
+But we already know from Lemma 3.1 that d∗ (deﬁned in Eq. 1) is the ﬁxed point of a contraction
+operator with constant γ. As J (0)(µ, ν) = 0, the following holds for all n ≥ 1
+
+Γn
+
+||d∗ − T n(0)||∞ ≤ γn||T (0) − 0||∞/(1 − γ) ≤ γn sup
+s,s(cid:48),a
+
+|Ra(s) − Ra(s(cid:48))|.
+
+(5)
+
+The ﬁnal result is easily obtained by putting together Equations 4 and 5.
+
+The result of the theorem provides a strategy for constructing reﬁning sequences with strong approx-
+imation guarantees. Still, it might be inconvenient to generate reﬁnements as large as S/∼Γn, as
+this might be over-complete; although faithful to the assumptions of the theorem, it might generate
+features that distinguish states that are not often visited, or pairs of states which are only slightly
+different. To address this issue, we provide a variation on the concept of reﬁnement that can be used
+to derive more ﬂexible reﬁning algorithms: reﬁnements that concentrate on local properties.
+Deﬁnition 3.3. Given a subset F ⊂ FS, and a subset ζ ⊂ S, two states s, s(cid:48) ∈ S are con-
+sistent on ζ with respect to F , denoted s ∼F,ζ s(cid:48), if ∀f ∈ F,∀a ∈ A, f (s) = f (s(cid:48)) and
+∀ˆs ∈ ζ, EP a(ˆs)[f ] = EP a(s)[f ] ⇐⇒ EP a(ˆs)[f ] = EP a(s(cid:48))[f ].
+Deﬁnition 3.4. Given two subspaces F, G ⊂ FS, G reﬁnes F locally with respect to ζ, denoted
+F (cid:110)ζ G, if F ⊆ G and ∀s, s(cid:48) ∈ S, s ∼F,ζ s(cid:48) ⇐⇒ [∀g ∈ G, g(s) = g(s(cid:48))].
+Deﬁnition 3.2 is the special case of Deﬁnition 3.4 corresponding to a reﬁnement with respect to the
+whole state space S, i.e. F (cid:110) G ≡ F (cid:110)S G. When the subset ζ is not important, we will use
+the notation V (cid:110)◦ W to say that W reﬁnes V locally with respect to some subset of S. The result
+below states that even if one provides local reﬁnements (cid:110)◦, one will eventually generate a pair of
+subspaces which are related through a global reﬁnement property (cid:110).
+Proposition 3.1. Let {Γi}n
+{ζi}n
+Then ∆(∼Γ0,η) ⊆ span(Γn).
+Proof. Assume s ∼Γn−1,ζn s(cid:48). We will check below all conditions necessary to conclude that
+s ∼Γ0,η s(cid:48). First, let f ∈ Γ0.
+It is immediate from the deﬁnition of local reﬁnements that
+∀j ≤ n − 1, Γj ⊆ Γn−1, so that s ∼Γ0,ζn s(cid:48). It follows that ∀f ∈ Γ0, f (s) = f (s(cid:48)).
+
+i=0 be a set of bases over S with Γi−1 (cid:110)ζi Γi, i = 1, ..., n, for some
+i=1 . Assume that Γn is the maximal reﬁnement (i.e. |Γn| = |S/∼Γn−1,ζn |). Let η = ∪iζi.
+
+5
+
+Next, ﬁx f ∈ Γ0, a ∈ A and ˆs ∈ η.
+If ˆs ∈ ζn, then EP a(ˆs)[f ] = EP a(s)[f ] ⇐⇒
+EP a(ˆs)[f ] = EP a(s(cid:48))[f ], by the assumption above on the pair s, s(cid:48). Otherwise, ∃j < n such that
+ˆs ∈ ζj and Γj−1 (cid:110)ζj Γj. But we already know that ∀f ∈ Γj, f (s) = f (s(cid:48)), as Γj ⊆ Γn−1. We
+can use this result in the deﬁnition of local reﬁnement Γj−1 (cid:110)ζj Γj to conclude that s ∼Γj−1,ζj s(cid:48).
+Moreover, as ˆs ∈ ζj, f ∈ Γ0 ⊆ Γj−1, EP a(ˆs)[f ] = EP a(s)[f ] ⇐⇒ EP a(ˆs)[f ] = EP a(s(cid:48))[f ]. This
+completes the deﬁnition of consistency on η, and it becomes clear that s ∼Γn−1,ζn s(cid:48) ⇒ s ∼Γ0,η s(cid:48),
+or ∆(∼Γ0,η) ⊆ span(∆(∼Γn−1,ζn )).
+Finally, both Γn and ∆(∼Γn−1,η) are bases of the same size, and both reﬁne Γn−1. It must be that
+span(Γn) = span(∆(∼Γn−1,ζn )) ⊇ ∆(∼Γ0,η).
+
+3.2 Examples of basis reﬁnement for feature extraction
+
+The concept of basis reﬁnement is not only applicable to the feature extraction methods we will
+present later, but to methods that have been studied in the past. In particular, methods based on
+Bellman error basis functions, state aggregation strategies, and spectral analysis using bisimulation
+metrics are all special cases of basis reﬁnement. We brieﬂy describe the reﬁnement property for
+the ﬁrst two cases, and, in the next section, we elaborate on the connection between reﬁnement and
+bisimulation metrics to provide a new condition for convergence to self-reﬁning bases.
+Krylov bases: Consider the uncontrolled (policy evaluation) case, in which one would like to
+ﬁnd a set of features that is suited to evaluating a single policy of interest. A common approach to
+automatic feature generation in this context computes Bellman error basis functions (BEBFs), which
+have been shown to generate a sequence of representations known as Krylov bases. Given a policy
+π, a Krylov basis Φn of size n is built using the model (Rπ, P π) (deﬁned in Section 2 as elements
+of FS and [[FS → FS]], respectively): Φn = span{Rπ, P πRπ, (P π)2Rπ, ..., (P π)nRπ}. It is not
+hard to check that Φn (cid:110) Φn+1, where (cid:110) is the reﬁnement relational property in Def 3.2. Since the
+initial feature Rπ ∈ ∆(∼0), the result in Theorem 3.1 holds for the Krylov bases.
+Under the assumption of a ﬁnite-state MDP (i.e. |S| < ∞), Γχ := {χ({s}) | s ∈ S} is a basis for
+FS, therefore this set of features is ﬁnite dimensional. It follows that one can ﬁnd N ≤ |S| such
+that one of the Krylov bases is a self-reﬁnement, i.e. ΦN (cid:110) ΦN . This would by no means be the
+only self-reﬁning basis. In fact this property holds for the basis of characteristic functions, Γχ (cid:110) Γχ.
+The purpose our framework is to determine other self-reﬁning bases which are suited for function
+approximation methods in the context of controlled systems.
+State aggregation: One popular strategy used for solving MDPs is that of computing state aggre-
+gation maps. Instead of working with alternative subspaces, these methods ﬁrst compute equiv-
+alence relations on the state space. An aggregate/collapsed model is then derived, and the so-
+lution to this model is translated to one for the original problem:
+the resulting policy provides
+the same action choice for states that have originally been related. Given any equivalence rela-
+tion ∼ on S, a state aggregation map is a function from S to any set X, ρ : S → X, such that
+∀s, s(cid:48), ρ(s(cid:48)) = ρ(s) ⇐⇒ s ∼ s(cid:48). In order to obtain a signiﬁcant computational gain, one would
+like to work with aggregation maps ρ that reduce the size of the space for which one looks to provide
+action choices, i.e. |X| (cid:28) |S|. As discussed in Section 3.1, one could work with features that are
+deﬁned on an aggregate state space instead of the original state space. That is, instead of computing
+a set of state features Γ ⊂ FS, we could work instead with an aggregation map ρ : S → X and a
+set of features over X, ˆΓ ⊂ FX. If ∼ is the relation such that s ∼ s(cid:48) ⇐⇒ ρ(s) = ρ(s(cid:48)), then
+∀ϕ ∈ ˆΓ, ϕ ◦ ρ ∈ span(∆(∼)).
+
+4 Using bisimulation metrics for convergence of bases
+
+In Section 3.2 we provide two examples of self-reﬁning subspaces: the Krylov bases and the charac-
+teristic functions on single states. The latter is the largest and sparsest basis; it spans the entire state
+space and the features share no information. The former is potentially smaller and it spans the value
+of the ﬁxed policy for which it was designed. In this section we will present a third self-reﬁning
+construction, which is designed to capture bisimulation properties. Based on the results presented
+in Section 3.1, it can be shown that given a bisimulation relation ∼, the partition it generates is
+self-reﬁning, i.e. ∆(∼) (cid:110) ∆(∼).
+
+6
+
+D(Γ) : (s, s(cid:48)) (cid:55)→ maxa
+
+(cid:12)(cid:12)EP a(s)[ϕ] − EP a(s(cid:48))[ϕ](cid:12)(cid:12)(cid:3)
+
+Desirable self-reﬁning bases might be be computationally demanding and/or too complex to use or
+represent. We propose iterative schemes which ultimately provide a self-reﬁning result - albeit we
+would have the ﬂexibility of stopping the iterative process before reaching the ﬁnal result. At the
+same time, we need a criterion to describe convergence of sequences of bases. That is, we would
+want to know how close an iterative process is to obtaining a self-reﬁning basis. Inspired by the ﬁxed
+point theory used to study bisimulation metrics [Desharnais et al., 1999], instead of using a metric
+over the set of all bases to characterize convergence of such sequences, we will use corresponding
+metrics over the original state space. This choice is better suited for generalizing previously existing
+methods that compare pairs of states for bisimilarity through their associated reward models and
+expected realizations of features over the next state distribution model associated with these states.
+We will study metric construction strategies based on a map D, deﬁned below, which takes an
+element of the powerset P(FS) of FS and returns an element of all pseudo-metrics M (S) over S.
+(6)
+Γ is a set of features whose expectation over next-state distributions should be matched. It is not hard
+to see that bases Γ for which D(Γ) is a bisimulation metric are by deﬁnition self-reﬁning. For exam-
+ple, consider the largest bisimulation relation ∼ on a given MDP. It is not hard to see that D(∆(∼))
+is a bisimulation. A more elaborate example involves the set Ω(d) of Lipschitz-1 continuous func-
+tions on [[(S, d) → (R, L1)]] (recall deﬁnition and computation details from Section 2). Deﬁne d∗
+to be the ﬁxed point of the operator T : d (cid:55)→ D(Ω(d)), i.e. d∗ = supn∈N T n(0). d∗ has the same
+property as the bisimulation metric deﬁned in Equation 1. Moreover, given any bisimulation metric
+d, D(Ω(d)) is a bisimulation metric.
+Deﬁnition 4.1. We say a sequence {Γn}∞
+n=1 is a a bisimulation sequence of bases if D(Γn) con-
+verges uniformly from below to a bisimulation metric. If one has the a sequence of reﬁning bases
+with Γn (cid:110) Γn+1,∀n, then {D(Γn)}∞
+n=1 is an increasing sequence, but not necessarily a bisimulation
+sequence.
+
+(cid:2)(1 − γ)|Ra(s) − Ra(s(cid:48))| + γ supϕ∈Γ
+
+A bisimulation sequence of bases provide an approximation scheme for bases that satisfy two im-
+portant properties studied in the past: self-reﬁnement and bisimilarity. One could show that the
+approximation schemes presented in [Ferns et al., 2004], [Comanici and Precup, 2011], and [Ruan
+et al., 2015] are all examples of bisimulation sequences. We will present in the next section a
+framework that generalizes all these examples, but which can be easily extended to a broader set of
+approximation schemes that incorporate both reﬁning and bisimulation principles.
+
+5 Prototype based reﬁnements
+
+In this section we propose a strategy that iteratively builds sequences of reﬁneing sets of fea-
+tures, based on the concepts described in the previous sections. This generates layered sets of
+features, where the nth layer in the construction will be dependent only on the (n − 1)th layer.
+Additionally, each feature will be associated with a reward-transition prototype: elements of
+Q := [[A → (R × P(S))]], associating to each action a reward and a next-state probability dis-
+tribution. Prototypes can be viewed as “abstract” or representative states, such as used in KBRL
+methods [Ormoneit and Sen, 2002]. In the layered structure, the similarity between prototypes at
+the nth layer is based on a measure of consistency with respect to features at the (n− 1)th layer. The
+same measure of similarity is used to determine whether the entire state space is “covered” by the
+set of prototypes/features chosen for the nth layer. We say that a space is covered if every state of
+the space is close to at least one prototype generated by the construction, with respect to a prede-
+ﬁned measure of similarity. This measure is designed to make sure that consecutive layers represent
+reﬁning sets of features. Note that for any given MDP, the state space S is embedded into Q (i.e.
+S ⊂ Q), as (Ra(s), P a(s)) ∈ Q for every state s ∈ S. Additionally, The metric generator D, as
+deﬁned in Equation 6, can be generalized to a map from P(FS) to M (Q).
+n=1, where Jn ⊂ Q is a set of covering
+The algorithmic strategy will look for a sequence {Jn, ιn}∞
+prototypes, and ιn : Jn → FS is a function that associates a feature to every prototype in Jn.
+Starting with J0 = ∅ and Γ0 = ∅, the strategy needs to ﬁnd, at step n > 0, a cover ˆJn for S,
+based on the distance metric D(Γn−1). That is, it has to guarantee that ∀s ∈ S,∃κ ∈ ˆJn with
+D(Γn−1)(s, κ) = 0. With Jn = ˆJn ∪ Jn−1 and using a strictly decreasing function τ : R≥0 → R
+(e.g. the energy-based Gibbs measure τ (x) = exp(−βx) for some β > 0), the framework constructs
+ιn : Jn → FS, a map that associates prototypes to features as ιn(κ)(s) = τ (D(Γn−1)(κ, s)).
+
+7
+
+Algorithm 1 Prototype reﬁnement
+1: J0 = ∅ and Γ0 = ∅
+2: for n = 1 to ∞ do
+3:
+4:
+5:
+6:
+
+choose a representative subset ζn ⊂ S and a cover approximation error n ≥ 0
+ﬁnd an n-cover ˆJn for ζn
+deﬁne Jn = ˆJn ∪ Jn−1
+choose a strictly decreasing function τ : R≥0 → R
+deﬁne ιn(κ) =
+deﬁne Γn = {ιn(κ) | κ ∈ Jn} (note that Γn is a local reﬁnement, Γn−1 (cid:110)ζn Γn)
+
+(cid:26)s (cid:55)→ τ (D(Γn−1)(κ, s))
+
+7:
+
+8:
+
+ιn−1(κ)
+
+if ∃ˆs ∈ ζn, such that D(Γn−1)(κ, ˆs) ≤ n
+otherwise
+
+It is not hard to see that the reﬁnement property holds at every step, i.e. Γn (cid:110) Γn+1. First, every
+equivalence class of ∼Γn is represented by some prototype in Jn. Second, ιn is purposely deﬁned
+to make sure that a distinction is made between each prototype in Jn+1. Moreover, {Γn}∞
+n=1 is a
+bisimulation sequence of bases, as the metric generator D is the main tool used in “covering” the
+state space with the set of prototypes Jn. Two states will be represented by the same prototype (i.e.
+they will be equivalent with respect to ∼Γn) if and only if the distance between their corresponding
+reward-transition models is 0.
+Algorithm 1 provides pseudo-code for the framework described in this section. Note that it also con-
+tains two additional modiﬁcations, used to illustrate the ﬂexibility of this feature extraction process.
+Through the ﬁrst modiﬁcation, one could use the intermediate results at time step n to determine
+a subset ζn ⊂ S of states which are likely to have a model with signiﬁcantly distinct dynamics
+over Γn−1. As such, the prototypes ˆJn−1 can be specialized to cover only the signiﬁcant subset ζn.
+Moreover Theorem 3.1 guarantees that if every state in S is picked in ζn inﬁnitely often, as n → ∞,
+then the approximation power of the ﬁnal result is not be compromised. The second modiﬁcation
+is based on using the values in the metric D(Γn−1) for more than just choosing feature activations:
+one could set at every step constants n ≥ 0 and then ﬁnd Jn such that ζn is covered using n-balls,
+i.e. for every state in ζn, there exists a prototype κ ∈ Jn with D(Γn−1)(κ, s) ≤ n. One can easily
+show that the reﬁnement property can be maintained using the modiﬁed deﬁtion of ιn described in
+Algorithm 1.
+
+6 Discussion
+
+We proposed a general framework for basis reﬁnement for linear function approximation. The the-
+oretical results show that any algorithmic scheme of this type satisﬁes strong bounds on the quality
+of the value function that can be obtained. In other words, this approach provides a “blueprint” for
+designing algorithms with good approximation guarantees. As discussed, some existing value func-
+tion construction schemes fall into this category (such as state aggregation reﬁnement, for example).
+Other methods, like BEBFs, can be interpreted in this way in the case of policy evaluation; however,
+the “traditional” BEBF approach in the case of control does not exactly ﬁt this framework. However,
+we suspect that it could be adapted to exactly follow this blueprint (something we leave for future
+work).
+We provided ideas for a new algorithmic approach to this problem, which would provide strong
+guarantees while being signiﬁcantly cheaper than other existing methods with similar bounds (which
+rely on bisimulation metrics). We plan to experiment with this approach in the future. The focus
+of this paper was to establish the theoretical underpinnings of the algorithm. The algorithm struc-
+ture we propose is close in spirit to [Barreto et al., 2011], which selects prototype states in order
+to represent well the dynamics of the system by means of stochastic factorization. However, their
+approach assumes a given metric which measures state similarity, and selects representative states
+using k-means clustering based on this metric. Instead, we iterate between computing the metric
+and choosing prototypes. We believe that the theory presented in this paper opens up the possibil-
+ity of further development of algorithms for constructive function approximation that have quality
+guarantees in the control case, and which can be effective also in practice.
+
+8
+
+References
+R. S. Sutton and A. G. Barto. Reinforcement Learning: An Introduction. MIT Press, 1998.
+Cs. Szepesvari. Algorithms for Reinforcement Learning. Morgan & Claypool, 2010.
+D. P. Bertsekas and D. A. Castanon. Adaptive Aggregation Methods for Inﬁnite Horizon Dynamic
+
+Programming. IEEE Transactions on Automatic Control, 34, 1989.
+
+R. Munos and A. Moore. Variable Resolution Discretization in Optimal Control. Machine Learning,
+
+49(2-3):291–323, 2002.
+
+S. Mahadevan. Proto-Value Functions: Developmental Reinforcement Learning. In ICML, pages
+
+553–560, 2005.
+
+P. W. Keller, S. Mannor, and D. Precup. Automatic Basis Function Construction for Approximate
+
+Dynamic Programming and Reinforcement Learning. In ICML, pages 449–456, 2006.
+
+R. Parr, C. Painter-Wakeﬁled, L. Li, and M. L. Littman. Analyzing Feature Generation for Value
+
+Function Approximation. In ICML, pages 737–744, 2008a.
+
+G. D. Konidaris, S. Osentoski, and P. S. Thomas. Value Function Approximation in Reinforcement
+
+Learning using the Fourier Basis. In AAAI, pages 380–385, 2011.
+
+A. Geramifard, F. Doshi, J. Redding, N. Roy, and J. How. Online Discovery of Feature Dependen-
+
+cies. In ICML, pages 881–888, 2011.
+
+B. Ravindran and A. G. Barto. Model Minimization in Hierarchical Reinforcement Learning. In
+
+Symposium on Abstraction, Reformulation and Approximation (SARA), pages 196–211, 2002.
+
+N. Ferns, P. Panangaden, and D. Precup. Metrics for ﬁnite Markov Decision Processes. In UAI,
+
+pages 162–169, 2004.
+
+S. Ruan, G. Comanici, P. Panangaden, and D. Precup. Representation Discovery for MDPs using
+
+Bisimulation Metrics. In AAAI, pages 3578–3584, 2015.
+
+R. Givan, T. Dean, and M. Greig. Equivalence Notions and Model Minimization in Markov Decision
+
+Processes. Artiﬁcial Intelligence, 147(1-2):163–223, 2003.
+
+D. Ormoneit and S. Sen. Kernel-Based Reinforcement Learning. Machine Learning, 49(2-3):161–
+
+178, 2002.
+
+N. Jong and P. Stone. Kernel-Based Models for Reinforcement Learning. In ICML Workshop on
+
+Kernel Machines and Reinforcement Learning, 2006.
+
+A. S. Barreto, D. Precup, and J. Pineau. Reinforcement Learning using Kernel-Based Stochastic
+
+Factorization. In NIPS, pages 720–728, 2011.
+
+R. S. Sutton. Learning to Predict by the Methods of Temporal Differences. Machine Learning, 3
+
+(1):9–44, 1988.
+
+S. J. Bradtke and A. G. Barto. Linear Least-Squares Algorithms for Temporal Difference Learning.
+
+Machine Learning, 22(1-3):33–57, 1996.
+
+H. Yu and D. Bertsekas. Convergence Results for Some Temporal Difference Methods Based on
+
+Least Squares. Technical report, LIDS MIT, 2006.
+
+R. Parr, L. Li, G. Taylor, C. Painter-Wakeﬁeld, and M. L. Littman. An Analysis of Linear Models,
+In
+
+Linear Value-Function Approximation, and Feature Selection for Reinforcement Learning.
+ICML, pages 752–759, 2008b.
+
+K. G. Larsen and A. Skou. Bisimulation through Probabilistic Testing. Information and Computa-
+
+tion, 94:1–28, 1991.
+
+J. Desharnais, V. Gupta, R. Jagadeesan, and P. Panangaden. Metrics for Labeled Markov Systems.
+
+In CONCUR, 1999.
+
+J. Desharnais, V. Gupta, R. Jagadeesan, and P. Panangaden. A metric for labelled Markov processes.
+
+Theoretical Computer Science, 318(3):323–354, 2004.
+
+C. Villani. Topics in optimal transportation. American Mathematical Society, 2003.
+G. Comanici and D. Precup. Basis Function Discovery Using Spectral Clustering and Bisimulation
+
+Metrics. In AAAI, 2011.
+
+D. Blackwell. Discounted Dynamic Programming. Annals of Mathematical Statistics, 36:226–235,
+
+1965.
+
+9
+
+

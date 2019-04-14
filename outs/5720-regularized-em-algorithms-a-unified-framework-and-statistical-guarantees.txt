@@ -1,0 +1,885 @@
+Regularized EM Algorithms: A Uniﬁed Framework
+
+and Statistical Guarantees
+
+Dept. of Electrical and Computer Engineering
+
+Dept. of Electrical and Computer Engineering
+
+Xinyang Yi
+
+Constantine Caramanis
+
+The University of Texas at Austin
+
+yixy@utexas.edu
+
+The University of Texas at Austin
+constantine@utexas.edu
+
+Abstract
+
+Latent models are a fundamental modeling tool in machine learning applications,
+but they present signiﬁcant computational and analytical challenges. The popular
+EM algorithm and its variants, is a much used algorithmic tool; yet our rigorous
+understanding of its performance is highly incomplete. Recently, work in [1] has
+demonstrated that for an important class of problems, EM exhibits linear local
+convergence. In the high-dimensional setting, however, the M-step may not be
+well deﬁned. We address precisely this setting through a uniﬁed treatment using
+regularization. While regularization for high-dimensional problems is by now
+well understood, the iterative EM algorithm requires a careful balancing of making
+progress towards the solution while identifying the right structure (e.g., sparsity or
+low-rank). In particular, regularizing the M-step using the state-of-the-art high-
+dimensional prescriptions (e.g., `a la [19]) is not guaranteed to provide this balance.
+Our algorithm and analysis are linked in a way that reveals the balance between
+optimization and statistical errors. We specialize our general framework to sparse
+gaussian mixture models, high-dimensional mixed regression, and regression with
+missing variables, obtaining statistical guarantees for each of these examples.
+
+1
+
+Introduction
+
+We give general conditions for the convergence of the EM method for high-dimensional estimation.
+We specialize these conditions to several problems of interest, including high-dimensional sparse
+and low-rank mixed regression, sparse gaussian mixture models, and regression with missing covari-
+ates. As we explain below, the key problem in the high-dimensional setting is the M-step. A natural
+idea is to modify this step via appropriate regularization, yet choosing the appropriate sequence of
+regularizers is a critical problem. As we know from the theory of regularized M-estimators (e.g.,
+[19]) the regularizer should be chosen proportional to the target estimation error. For EM, however,
+the target estimation error changes at each step.
+The main contribution of our work is technical: we show how to perform this iterative regularization.
+We show that the regularization sequence must be chosen so that it converges to a quantity controlled
+by the ultimate estimation error. In existing work, the estimation error is given by the relationship
+between the population and empirical M-step operators, but this too is not well deﬁned in the high-
+dimensional setting. Thus a key step, related both to our algorithm and its convergence analysis, is
+obtaining a different characterization of statistical error for the high-dimensional setting.
+
+Background and Related Work
+
+EM (e.g., [8, 12]) is a general algorithmic approach for handling latent variable models (including
+mixtures), popular largely because it is typically computationally highly scalable, and easy to im-
+plement. On the ﬂip side, despite a fairly long history of studying EM in theory (e.g., [12, 17, 21]),
+
+1
+
+very little has been understood about general statistical guarantees until recently. Very recent work
+in [1] establishes a general local convergence theorem (i.e., assuming initialization lies in a lo-
+cal region around true parameter) and statistical guarantees for EM, which is then specialized to
+obtain near-optimal rates for several speciﬁc low-dimensional problems – low-dimensional in the
+sense of the classical statistical setting where the samples outnumber the dimension. A central chal-
+lenge in extending EM (and as a corollary, the analysis in [1]) to the high-dimensional regime is
+the M-step. On the algorithm side, the M-step will not be stable (or even well-deﬁned in some
+cases) in the high-dimensional setting. To make matters worse, any analysis that relies on showing
+that the ﬁnite-sample M-step is somehow “close” to the M-step performed with inﬁnite data (the
+population-level M-step) simply cannot apply in the high-dimensional regime. Recent work in [20]
+treats high-dimensional EM using a truncated M-step. This works in some settings, but also requires
+specialized treatment for every different setting, precisely because of the difﬁculty with the M-step.
+In contrast to work in [20], we pursue a high-dimensional extension via regularization. The central
+challenge, as mentioned above, is in picking the sequence of regularization coefﬁcients, as this
+must control the optimization error (related to the special structure of β∗), as well as the statistical
+error. Finally, we note that for ﬁnite mixture regression, St¨adler et al.[16] consider an (cid:96)1 regularized
+EM algorithm for which they develop some asymptotic analysis and oracle inequality. However,
+this work doesn’t establish the theoretical properties of local optima arising from regularized EM.
+Our work addresses this issue from a local convergence perspective by using a novel choice of
+regularization.
+
+2 Classical EM and Challenges in High Dimensions
+
+The EM algorithm is an iterative algorithm designed to combat the non-convexity of max likelihood
+due to latent variables. For space concerns we omit the standard derivation, and only give the
+deﬁnitions we need in the sequel. Let Y , Z be random variables taking values in Y,Z, with joint
+distribution fβ(y, z) depending on model parameter β ⊆ Ω ⊆ Rp. We observe samples of Y but not
+of the latent variable Z. EM seeks to maximize a lower bound on the maximum likelihood function
+for β. Letting κβ(z|y) denote the conditional distribution of Z given Y = y, letting yβ∗ (y) denote
+the marginal distribution of Y , and deﬁning the function
+
+Qn(β(cid:48)|β) :=
+
+1
+n
+
+κβ(z|yi) log fβ(cid:48)(yi, z)dz,
+
+(2.1)
+
+one iteration of the EM algorithm, mapping β(t) to β(t+1), consists of the following two steps:
+
+• E-step: Compute function Qn(β|β(t)) given β(t).
+• M-step: β(t+1) ← Mn(β) := arg maxβ(cid:48)∈Ω Qn(β(cid:48)|β(t)).
+
+We can deﬁne the population (inﬁnite sample) versions of Qn and Mn in a natural manner:
+
+(cid:90)
+
+n(cid:88)
+
+Z
+
+i=1
+
+(cid:90)
+
+(cid:90)
+
+:=
+
+Q(β(cid:48)|β)
+yβ∗ (y)
+M(β) = arg max
+β(cid:48)∈Ω
+
+Y
+
+Z
+
+Q(β(cid:48)|β).
+
+κβ(z|y) log fβ(cid:48)(y, z)dzdy
+
+(2.2)
+
+(2.3)
+
+This paper is about the high-dimensional setting where the number of samples n may be far less
+than the dimensionality p of the parameter β, but where β exhibits some special structure, e.g., it
+may be a sparse vector or a low-rank matrix. In such a setting, the M-step of the EM algorithm may
+be highly problematic. In many settings, for example sparse mixed regression, the M-step may not
+even be well deﬁned. More generally, when n (cid:28) p, Mn(β) may be far from the population version,
+M(β), and in particular, the minimum estimation error (cid:107)Mn(β∗) − M(β∗)(cid:107) can be much larger
+than the signal strength (cid:107)β∗(cid:107). This quantity is used in [1] as well as in follow-up work in [20], as a
+measure of statistical error. In the high dimensional setting, something else is needed.
+
+3 Algorithm
+
+The basis of our algorithm is the by-now well understood concept of regularized high dimensional
+estimators, where the regularization is tuned to the underlying structure of β∗, thus deﬁning a regu-
+
+2
+
+larized M-step via
+
+Mr
+
+Qn(β(cid:48)|β) − λnR(β(cid:48)),
+
+(cid:107)Mr
+
+n(β(t)) − β∗(cid:107)2 ≤ (cid:107)Mr
+
+n(β(t)) − Mr
+
+n(β) := arg max
+β(cid:48)∈Ω
+
+(3.1)
+where R(·) denotes an appropriate regularizer chosen to match the structure of β∗. The key chal-
+lenge is how to choose the sequence of regularizers {λ(t)
+n } in the iterative process, so as to control
+optimization and statistical error. As detailed in Algorithm 1, our sequence of regularizers attempts
+to match the target estimation error at each step of the EM iteration. For an intuition of what this
+might look like, consider the estimation error at step t: (cid:107)Mr
+n(β(t)) − β∗(cid:107)2. By the triangle in-
+equality, we can bound this by a sum of two terms: the optimization error and the ﬁnal estimation
+error:
+
+n = κλ(t−1)
+
+(3.2)
+Since we expect (and show) linear convergence of the optimization, it is natural to update λ(t)
+n via a
+recursion of the form λ(t)
++∆ as in (3.3), where the ﬁrst term represents the optimization
+error, and ∆ represents the ﬁnal statistical error, i.e., the last term above in (3.2). A key part of our
+analysis shows that this error (and hence ∆) is controlled by (cid:107)∇Qn(β∗|β)−∇Q(β∗|β)(cid:107)R∗, which
+in turn can be bounded uniformly for a variety of important applications of EM, including the three
+discussed in this paper (see Section 5). While a technical point, it is this key insight that enables
+the right choice of algorithm and its analysis. In the cases we consider, we obtain min-max optimal
+rates of convergence, demonstrating that no algorithm, let alone another variant of EM, can perform
+better.
+Algorithm 1 Regularized EM Algorithm
+Input Samples {yi}n
+
+i=1, regularizer R, number of iterations T , initial parameter β(0), initial regu-
+
+n(β∗)(cid:107)2 + (cid:107)Mr
+
+n(β∗) − β∗(cid:107)2.
+
+n
+
+larization parameter λ(0)
+
+n , estimated statistical error ∆, contractive factor κ < 1.
+
+1: For t = 1, 2, . . . , T do
+2:
+
+Regularization parameter update:
+
+n ← κλ(t−1)
+λ(t)
+
+n
+
++ ∆.
+
+(3.3)
+
+3:
+4:
+
+E-step: Compute function Qn(·|β(t−1)) according to (2.1).
+Regularized M-step:
+
+β(t) ← Mr
+
+n(β(t−1)) := arg max
+β∈Ω
+
+Qn(β|β(t−1)) − λ(t)
+
+n · R(β).
+
+5: End For
+Output β(T ).
+
+4 Statistical Guarantees
+
+We now turn to the theoretical analysis of regularized EM algorithm. We ﬁrst set up a general
+analytical framework for regularized EM where the key ingredients are decomposable regularizer
+and several technical conditions on the population based Q(·|·) and the sample based Qn(·|·). In
+Section 4.3, we provide our main result (Theorem 1) that characterizes both computational and
+statistical performance of the proposed variant of regularized EM algorithm.
+
+4.1 Decomposable Regularizers
+
+Decomposable regularizers (e.g., [3, 6, 14, 19]), have been shown to be useful both empirically and
+theoretically for high dimensional structural estimation, and they also play an important role in our
+analytical framework. Recall that for R : Rp → R+ a norm, and a pair of subspaces (S,S) in Rp
+such that S ⊆ S, we have the following deﬁnition:
+Deﬁnition 1 (Decomposability). Regularizer R : Rp → R+ is decomposable with respect to (S,S)
+if
+
+R(u + v) = R(u) + R(v), for any u ∈ S, v ∈ S⊥
+
+.
+
+Typically, the structure of model parameter β∗ can be characterized by specifying a subspace S such
+that β∗ ∈ S. The common use of a regularizer is thus to penalize the compositions of solution that
+
+3
+
+live outside S. We are interested in bounding the estimation error in some norm (cid:107)·(cid:107). The following
+quantity is critical in connecting R to (cid:107) · (cid:107).
+Deﬁnition 2 (Subspace Compatibility Constant). For any subspace S ⊆ Rp, a given regularizer R
+and some norm (cid:107) · (cid:107), the subspace compatibility constant of S with respect to R,(cid:107) · (cid:107) is given by
+
+Ψ(S) := sup
+
+u∈S\{0}
+
+R(u)
+(cid:107)u(cid:107) .
+
+(cid:10)u, v(cid:11). To simplify notation,
+
+As is standard, the dual norm of R is deﬁned as R∗(v) := supR(u)≤1
+we let (cid:107)u(cid:107)R := R(u) and (cid:107)u(cid:107)R∗ := R∗(u).
+4.2 Conditions on Q(·|·) and Qn(·|·)
+Next, we review three technical conditions, originally proposed by [1], on the population level Q(·|·)
+function, and then we give two important conditions that the empirial function Qn(·|·) must satisfy,
+including one that characterizes the statistical error.
+It is well known that performance of EM algorithm is sensitive to initialization. Following the low-
+dimensional development in [1], our results are local, and apply to an r-neighborhood region around
+
+β∗: B(r; β∗) :=(cid:8)u ∈ Ω,(cid:107)u − β∗(cid:107) ≤ r(cid:9).
+
+We ﬁrst require that Q(·|β∗) is self consistent as stated below. This is satisﬁed, in particular, when
+β∗ maximizes the population log likelihood function, as happens in most settings of interest [12].
+Condition 1 (Self Consistency). Function Q(·|β∗) is self consistent, namely
+
+β∗ = arg max
+β∈Ω
+
+Q(β|β∗).
+
+(cid:107)β2 − β1(cid:107)2, ∀ β1, β2 ∈ Ω.
+
+(4.1)
+
+We also require that the function Q(·|·) satisﬁes a certain strong concavity condition and is smooth
+over Ω.
+Condition 2 (Strong Concavity and Smoothness (γ, µ, r)). Q(·|β∗) is γ-strongly concave over Ω,
+i.e.,
+
+Q(β2|β∗) − Q(β1|β∗) −(cid:10)∇Q(β1|β∗), β2 − β1
+Q(β2|β) − Q(β1|β) −(cid:10)∇Q(β1|β), β2 − β1
+
+For any β ∈ B(r; β∗), Q(·|β) is µ-smooth over Ω, i.e.,
+
+(cid:11) ≤ − γ
+(cid:11) ≥ − µ
+
+2
+
+(cid:107)β2 − β1(cid:107)2, ∀ β1, β2 ∈ Ω.
+
+2
+
+(4.2)
+The next condition is key in guaranteeing the curvature of Q(·|β) is similar to that of Q(·|β∗) when
+β is close to β∗. It has also been called First Order Stability in [1].
+Condition 3 (Gradient Stability (τ, r)). For any β ∈ B(r; β∗), we have
+
+(cid:13)(cid:13)∇Q(M(β)|β) − ∇Q(M(β)|β∗)(cid:13)(cid:13) ≤ τ(cid:107)β − β∗(cid:107).
+3 that is(cid:13)(cid:13)∇Q(β(cid:48)|β) − ∇Q(β(cid:48)|β∗)(cid:13)(cid:13) ≤ τ(cid:107)β − β∗(cid:107), ∀ β(cid:48) ∈ B(r; β∗).
+
+The above condition only requires that the gradient be stable at one point M(β). This is sufﬁcient
+for our analysis. In fact, for many concrete examples, one can verify a stronger version of Condition
+
+Next we require two conditions on the empirical function Qn(·|·), which is computed from ﬁnite
+number of samples according to (2.1). Our ﬁrst condition, parallel to Condition 2, imposes a cur-
+vature constraint on Qn(·|·). In order to guarantee that the estimation error (cid:107)β(t) − β∗(cid:107) in step t
+of the EM algorithm is well controlled, we would like Qn(·|β(t−1)) to be strongly concave at β∗.
+However, in the setting where n (cid:28) p, there might exist directions along which Qn(·|β(t−1)) is ﬂat,
+e.g., as in mixed linear regression and missing covariate regression. In contrast with Condition 2, we
+only require Qn(·|·) to be strongly concave over a particular set C(S,S;R) that is deﬁned in terms
+of the subspace pair (S,S) and regularizer R. This set is deﬁned as follows:
+
+u ∈ Rp :(cid:13)(cid:13)ΠS⊥ (u)(cid:13)(cid:13)R ≤ 2 ·(cid:13)(cid:13)ΠS (u)(cid:13)(cid:13)R + 2 · Ψ(S) ·(cid:13)(cid:13)u(cid:13)(cid:13)(cid:27)
+
+(4.3)
+where the projection operator ΠS : Rp → Rp is deﬁned as ΠS (u) := arg minv∈S (cid:107)v − u(cid:107). The
+restricted strong concavity (RSC) condition is as follows.
+
+C(S,S;R) :=
+
+(cid:26)
+
+,
+
+4
+
+Condition 4 (RSC (γn,S,S, r, δ)). For any ﬁxed β ∈ B(r; β∗), with probability at least 1 − δ, we
+
+have that for all β(cid:48) − β∗ ∈ Ω(cid:84)C(S,S;R),
+
+Qn(β(cid:48)|β) − Qn(β∗|β) −(cid:10)∇Qn(β∗|β), β(cid:48) − β∗(cid:11) ≤ − γn
+
+(cid:107)β(cid:48) − β∗(cid:107)2.
+
+2
+
+difference is immaterial. This is because(cid:13)(cid:13)ΠS (u)(cid:13)(cid:13)R is within a constant factor of Ψ(S) ·(cid:13)(cid:13)u(cid:13)(cid:13), and
+
+The above condition states that Qn(·|β) is strongly concave in directions β(cid:48) − β∗ that belong to
+C(S,S;R). It is instructive to compare Condition 4 with a related condition proposed by [14] for
+analyzing high dimensional M-estimators. They require the loss function to be strongly convex over
+the cone {u ∈ Rp : (cid:107)ΠS⊥(u)(cid:107)R (cid:46) (cid:107)ΠS (u)(cid:107)R}. Therefore our restrictive set (4.3) is similar to the
+cone but has the additional term 2Ψ(S)(cid:107)u(cid:107). The main purpose of the term 2Ψ(S)(cid:107)u(cid:107) is to allow
+the regularization parameter λn to jointly control optimization and statistical error. We note that
+while Condition 4 is stronger than the usual RSC condition in M-estimator, in typical settings the
+hence checking RSC over C amounts to checking it over (cid:107)ΠS⊥(u)(cid:107)R (cid:46) Ψ(S)(cid:107)u(cid:107), which is indeed
+what is typically also done in the M-estimator setting.
+Finally, we establish the condition that characterizes the achievable statistical error.
+Condition 5 (Statistical Error (∆n, r, δ)). For any ﬁxed β ∈ B(r; β∗), with probability at least
+1 − δ, we have
+
+(cid:13)(cid:13)∇Qn(β∗|β) − ∇Q(β∗|β)(cid:13)(cid:13)R∗ ≤ ∆n.
+
+(4.4)
+This quantity replaces the term (cid:107)Mn(β)−M(β)(cid:107) which appears in [1] and [20], and which presents
+problems in the high dimensional regime.
+
+4.3 Main Results
+
+In this section, we provide the theoretical guarantees for a resampled version of our regularized EM
+algorithm: we split the whole dataset into T pieces and use a fresh piece of data in each iteration of
+regularized EM. As in [1], resampling makes it possible to check that Conditions 4-5 are satisﬁed
+without requiring them to hold uniformly for all β ∈ B(r; β∗) with high probability. Our empirical
+results indicate that it is not in fact required and is an artifact of the analysis. We refer to this
+resampled version as Algorithm 2. In the sequel, we let m := n/T to denote the sample complexity
+in each iteration. We let α := supu∈Rp\{0} (cid:107)u(cid:107)∗/(cid:107)u(cid:107), where (cid:107) · (cid:107)∗ is the dual norm of (cid:107) · (cid:107).
+For Algorithm 2, our main result is as follows. The proof is deferred to the Supplemental Material.
+Theorem 1. Assume the model parameter β∗ ∈ S and regularizer R is decomposable with respect
+to (S,S) where S ⊆ S ⊆ Rp. Assume r > 0 is such that B(r; β∗) ⊆ Ω. Further, assume function
+Q(·|·), deﬁned in (2.2), is self consistent and satisﬁes Conditions 2-3 with parameters (γ, µ, r) and
+(τ, r). Given n samples and T iterations, let m := n/T . Assume Qm(·|·), computed from any
+m i.i.d. samples according to (2.1), satisﬁes Conditions 4-5 with parameters (γm,S,S, r, 0.5δ/T )
+, and assume 0 < τ < γ and 0 < κ∗ ≤ 3/4. Deﬁne
+and (∆m, r, 0.5δ/T ). Let κ∗ := 5 αµτ
+∆ := rγm/[60Ψ(S)] and assume ∆m is such that ∆m ≤ ∆.
+Consider Algorithm 2 with initialization β(0) ∈ B(r; β∗) and with regularization parameters given
+by
+
+γγm
+
+m = κt γm
+λ(t)
+5Ψ(S)
+
+(4.5)
+for any ∆ ∈ [3∆m, 3∆], κ ∈ [κ∗, 3/4]. Then with probability at least 1 − δ, we have that for any
+t ∈ [T ],
+
+∆, t = 1, 2, . . . , T
+
+(cid:107)β(0) − β∗(cid:107) +
+
+1 − κt
+1 − κ
+
+(cid:107)β(t) − β∗(cid:107) ≤ κt(cid:107)β(0) − β∗(cid:107) +
+
+5
+γm
+
+1 − κt
+1 − κ
+
+Ψ(S)∆.
+
+(4.6)
+
+The estimation error is bounded by a term decaying linearly with number of iterations t, which we
+can think of as the optimization error and a second term that characterizes the ultimate estimation
+error of our algorithm. With T = O(log n) and suitable choice of ∆ such that ∆ = O(∆n/T ), we
+bound the ultimate estimation error as
+
+(cid:107)β(T ) − β∗(cid:107) (cid:46)
+
+1
+
+(1 − κ)γn/T
+
+Ψ(S)∆n/T .
+
+(4.7)
+
+5
+
+We note that overestimating the initial error, (cid:107)β(0)−β∗(cid:107) is not important, as it may slightly increase
+the overall number of iterations, but will not impact the ultimate estimation error.
+The constraint ∆m (cid:46) rγm/Ψ(S) ensures that β(t) is contained in B(r; β∗) for all t ∈ [T ]. This
+constraint is quite mild in the sense that if ∆m = Ω(rγm/Ψ(S)), β(0) is a decent estimator with
+estimation error O(Ψ(S)∆m/γm) that already matches our expectation.
+
+5 Examples: Applying the Theory
+
+Now we introduce three well known latent variable models. For each model, we ﬁrst review the
+standard EM algorithm formulations, and discuss the extensions to the high dimensional setting.
+Then we apply Theorem 1 to obtain the statistical guarantee of the regularized EM with data splitting
+(Algorithm 2). The key ingredient underlying these results is to check the technical conditions in
+Section 4 hold for each model. We postpone these tedious details to the Supplemental Material.
+
+5.1 Gaussian Mixture Model
+
+We consider the balanced isotropic Gaussian mixture model (GMM) with two components where
+the distribution of random variables (Y, Z) ∈ Rp × {−1, 1} is characterized as
+
+Pr (Y = y|Z = z) = φ(y; z · β∗, σ2Ip), Pr(Z = 1) = Pr(Z = −1) = 1/2.
+
+Here we use φ(·|µ, Σ) to denote the probability density function of N (µ, Σ). In this example, Z
+is the latent variable that indicates the cluster id of each sample. Given n i.i.d. samples {yi}n
+i=1,
+function Qn(·|·) deﬁned in (2.1) corresponds to
+
+QGMM
+
+n
+
+(β(cid:48)|β) = − 1
+2n
+
+(cid:2)w(yi; β)(cid:107)yi − β(cid:48)(cid:107)2
+
+n(cid:88)
+
+i=1
+
+2 + (1 − w(yi; β))(cid:107)yi + β(cid:48)(cid:107)2
+
+2
+
+(5.1)
+
+(cid:3) ,
+
+2
+
+2
+
+2σ2
+
+)[exp (−(cid:107)y−β(cid:107)2
+
+where w(y; β) := exp (−(cid:107)y−β(cid:107)2
+)]−1. We assume β∗ ∈
+B0(s; p) := {u ∈ Rp : | supp(u)| ≤ s}. Naturally, we choose the regularizer R(·) to be the (cid:96)1
+norm. We deﬁne the signal-to-noise ratio SNR := (cid:107)β∗(cid:107)2/σ.
+Corollary 1 (Sparse Recovery in GMM). There exist constants ρ, C such that if SNR ≥ ρ, n/T ≥
+[80C((cid:107)β∗(cid:107)∞ + σ)/(cid:107)β∗(cid:107)2]2 s log p, β(0) ∈ B((cid:107)β∗(cid:107)2/4; β∗); then with probability at least 1− T /p
+s, any
+
+Algorithm 2 with parameters ∆ = C((cid:107)β∗(cid:107)∞ + σ)(cid:112)T log p/n, λ(0)
+
+) + exp (−(cid:107)y+β(cid:107)2
+
+n/T = 0.2(cid:107)β(0) − β∗(cid:107)2/
+
+κ ∈ [1/2, 3/4] and (cid:96)1 regularization generates β(t) that has estimation error
+
+√
+
+2σ2
+
+2σ2
+
+2
+
+5C((cid:107)β∗(cid:107)∞ + σ)
+
+(cid:107)β(t) − β∗(cid:107)2 ≤ κt(cid:107)β(0) − β∗(cid:107)2 +
+Note that by setting T (cid:16) log(n/ log p),
+
+((cid:107)β∗(cid:107)∞ + δ)(cid:112)(s log p)/n) log (n/ log p). The minimax rate for estimating s-sparse vector in a
+single Gaussian cluster is(cid:112)s log p/n, thereby the rate is optimal on (n, p, s) up to a log factor.
+
+the order of ﬁnal estimation error turns out to be
+
+T , for all t ∈ [T ].
+
+1 − κ
+
+s log p
+
+(5.2)
+
+n
+
+(cid:114)
+
+5.2 Mixed Linear Regression
+
+Mixed linear regression (MLR), as considered in some recent work [5, 7, 22], is the problem of
+recovering two or more linear vectors from mixed linear measurements. In the case of mixed linear
+regression with two symmetric and balanced components, the response-covariate pair (Y, X) ∈
+R × Rp is linked through
+where W is the noise term and Z is the latent variable that has Rademacher distribution over {−1, 1}.
+We assume X ∼ N (0, Ip), W ∼ N (0, σ2). In this setting, with n i.i.d. samples {yi, xi}n
+i=1 of pair
+(Y, X), function Qn(·|·) then corresponds to
+
+(cid:2)w(yi, xi; β)(yi − (cid:104)xi, β(cid:48)(cid:105))2 + (1 − w(yi, xi; β))(yi + (cid:104)xi, β(cid:48)(cid:105))2(cid:3) ,
+
+Y = (cid:104)X, Z · β∗(cid:105) + W,
+
+n(cid:88)
+
+QM LR
+
+n
+
+(β(cid:48)|β) = − 1
+2n
+
+i=1
+
+6
+
+(5.3)
+
+2σ2
+
+2σ2
+
+2σ2
+
+)]−1.
+
+)[exp (− (y−(cid:104)x,β(cid:105))2
+
+) + exp (− (y+(cid:104)x,β(cid:105))2
+
+where w(y, x; β) := exp (− (y−(cid:104)x,β(cid:105))2
+We consider two kinds of structure on β∗:
+Sparse Recovery. Assume β∗ ∈ B0(s; p). Then let R be the (cid:96)1 norm, as in the previous section.
+We deﬁne SNR := (cid:107)β∗(cid:107)2/σ.
+Corollary 2 (Sparse recovery in MLR). There exist constant ρ, C, C(cid:48) such that if SNR ≥ ρ, n/T ≥
+C(cid:48) [((cid:107)β∗(cid:107)2 + δ)/(cid:107)β∗(cid:107)2]2 s log p, β(0) ∈ B((cid:107)β∗(cid:107)2/240, β∗); then with probability at least 1− T /p
+s), any
+
+Algorithm 2 with parameters ∆ = C((cid:107)β∗(cid:107)2 + δ)(cid:112)T log p/n, λ(0)
+√
+n/T = (cid:107)β(0) − β∗(cid:107)2/(15
+(cid:114)
+
+κ ∈ [1/2, 3/4] and (cid:96)1 regularization generates β(t) that has estimation error
+
+(cid:107)β(t) − β∗(cid:107)2 ≤ κt(cid:107)β(0) − β∗(cid:107)2 +
+
+s log p
+
+T , for all t ∈ [T ].
+
+15C((cid:107)β∗(cid:107)2 + δ)
+
+1 − κ
+
+n
+
+(cid:16)
+
+log(n/(s log p))
+
+δ)(cid:112)(s log p/n) log (n/(s log p)) which is near-optimal on (s, p, n). The dependence on (cid:107)β∗(cid:107)2,
+
+iterations gives us
+
+((cid:107)β∗(cid:107)2 +
+
+estimation rate
+
+Performing T
+
+which also appears in the analysis of EM in the classical (low dimensional) setting [1], arises from
+fundamental limits of EM. Removing such dependence for MLR is possible by convex relaxation
+[7]. It is interesting to study how to remove it in the high dimensional setting.
+Low Rank Recovery. Second we consider the setting where the model parameter is a matrix Γ∗ ∈
+Rp1×p2 with rank(Γ∗) = θ (cid:28) min(p1, p2). We further assume X ∈ Rp1×p2 is an i.i.d. Gaussian
+matrix, i.e., entries of X are independent random variables with distribution N (0, 1). We apply
+i=1 |si(Γ)|, where
+si(Γ) is the ith singular value of Γ. Similarly, we let SNR := (cid:107)Γ∗(cid:107)F /σ.
+Corollary 3 (Low rank recovery in MLR). There exist constant ρ, C, C(cid:48) such that if SNR ≥ ρ,
+n/T ≥ C(cid:48) [((cid:107)Γ∗(cid:107)F + σ)/(cid:107)Γ∗(cid:107)F ]2 θ(p1 + p2), Γ(0) ∈ B((cid:107)Γ∗(cid:107)F /1600, Γ∗); then with probability
+2θ, any κ ∈ [1/2, 3/4] and nuclear norm regularization generates
+n/T = 0.01(cid:107)Γ(0) − Γ∗(cid:107)F /
+λ(0)
+Γ(t) that has estimation error
+
+nuclear norm regularization to serve the low rank structure, i.e, R(Γ) = (cid:80)p1,p2
+at least 1 − T exp(−p1 − p2) Algorithm 2 with parameters ∆ = C((cid:107)Γ∗(cid:107)F + σ)(cid:112)T (p1 + p2)/n,
+
+√
+
+(cid:107)Γ(t) − Γ∗(cid:107)F ≤ κt(cid:107)Γ(0) − Γ∗(cid:107)F +
+
+100C(cid:48)((cid:107)Γ∗(cid:107)F + σ)
+
+1 − κ
+
+2θ(p1 + p2)
+
+n
+
+T , for all t ∈ [T ].
+
+(cid:114)
+
+The standard low rank matrix recovery with a single component, including other sensing matrix
+designs beyond the Gaussianity, has been studied extensively (e.g., [2, 4, 13, 15]). To the best of our
+knowledge, the theoretical study of the mixed low rank matrix recovery has not been considered.
+
+5.3 Missing Covariate Regression
+
+As our last example, we consider the missing covariate regression (MCR) problem. To parallel
+standard linear regression, {yi, xi}n
+i=1 are samples of (Y, X) linked through Y = (cid:104)X, β∗(cid:105) + W .
+However, we assume each entry of xi is missing independently with probability  ∈ (0, 1). There-
+
+fore, the observed covariate vector(cid:101)xi takes the form
+
+(cid:26)xi,j with probability 1 − 
+
+(cid:101)xi,j =
+
+∗
+
+otherwise
+
+.
+
+We assume the model is under Gaussian design X ∼ N (0, Ip), W ∼ N (0, σ2). We refer the
+reader to our Supplementary Material for the speciﬁc Qn(·|·) function. In high dimensional case,
+we assume β∗ ∈ B0(s; p). We deﬁne ρ := (cid:107)β∗(cid:107)2/σ to be the SNR and ω := r/(cid:107)β∗(cid:107)2 to be the
+relative contractivity radius. In particular, let ζ := (1 + ω)ρ.
+Corollary 4 (Sparse Recovery in MCR). There exist constants C, C(cid:48), C0, C1 such that if (1+ω)ρ ≤
+C0 < 1,  < C1, n/T ≥ C(cid:48) max{σ2(ωρ)−1, 1}s log p, β(0) ∈ B(ω(cid:107)β∗(cid:107)2, β∗); then with prob-
+n/T = (cid:107)β(0) −
+
+ability at least 1 − T /p Algorithm 2 with parameters ∆ = Cσ(cid:112)T log p/n, λ(0)
+
+s), any κ ∈ [1/2, 3/4] and (cid:96)1 regularization generates β(t) that has estimation error
+(cid:107)β(t) − β∗(cid:107)2 ≤ κt(cid:107)β(0) − β∗(cid:107)2 +
+
+T , for all t ∈ [T ],
+
+s log p
+
+√
+β∗(cid:107)2/(45
+
+(cid:114)
+
+45Cσ
+1 − κ
+
+n
+
+7
+
+Unlike the previous two models, we require an upper bound on the signal to noise ratio. This unusual
+constraint is in fact unavoidable [10]. By optimizing T , the order of ﬁnal estimation error turns out
+
+to be σ(cid:112)s log p/n log(n/(s log p)).
+
+6 Simulations
+
+We now provide some simulation results to back up our theory. Note that while Theorem 1 requires
+resampling, we believe in practice this is unnecessary. This is validated by our results, where we
+apply Algorithm 1 to the four latent variable models discussed in Section 5.
+Convergence Rate. We ﬁrst evaluate the convergence of Algorithm 1 assuming only that the initial-
+ization is a bounded distance from β∗. For a given error ω(cid:107)β∗(cid:107)2, the initial parameter β(0) is picked
+randomly from the sphere centered around β∗ with radius ω(cid:107)β∗(cid:107)2. We use Algorithm 1 with T = 7,
+κ = 0.7, λ(0)
+n in Theorem 1. The choice of the critical parameter ∆ is given in the Supplementary
+Material. For every single trial, we report estimation error (cid:107)β(t) − β∗(cid:107)2 and optimization error
+(cid:107)β(t) − β(T )(cid:107)2 in every iteration. We plot the log of errors over iteration t in Figure 1.
+
+(a) GMM
+
+(b) MLR(sparse)
+
+(c) MLR(low rank)
+
+(d) MCR
+
+Figure 1: Convergence of regularized EM algorithm. In each panel, one curve is plotted from single
+independent trial. Settings: (a,b,d) (n, p, s) = (500, 800, 5); (d) (n, p, θ) = (600, 30, 3); (a-c)
+SNR = 5; (d) (SNR, ) = (0.5, 0.2); (a-d) ω = 0.5.
+
+Statistical Rate. We now evaluate the statistical rate. We set T = 7 and compute estimation error
+
+on (cid:98)β := β(T ). In Figure 2, we plot (cid:107)(cid:98)β − β∗(cid:107)2 over normalized sample complexity, i.e., n/(s log p)
+
+for s-sparse parameter and n/(θp) for rank θ p-by-p parameter. We refer the reader to Figure 1 for
+other settings. We observe that the same normalized sample complexity leads to almost identical
+estimation error in practice, which thus supports the corresponding statistical rate established in
+Section 5.
+
+(a) GMM
+
+(b) MLR(sparse)
+
+(c) MLR(low rank)
+
+(d) MCR
+
+Figure 2: Statistical rates. Each point is an average of 20 independent trials. Settings: (a,b,d) s = 5;
+(c) θ = 3.
+
+Acknowledgments
+
+The authors would like to acknowledge NSF grants 1056028, 1302435 and 1116955. This research
+was also partially supported by the U.S. Department of Transportation through the Data-Supported
+Transportation Operations and Planning (D-STOP) Tier 1 University Transportation Center.
+
+8
+
+Number of iterations01234567Log error-6-5-4-3-2-101Est errorOpt errorNumber of iterations01234567Log error-10-8-6-4-202Est errorOpt errorNumber of iterations01234567Log error-4-3-2-101Est errorOpt errorNumber of iterations01234567Log error-3-2-10123Est errorOpt errorn/(slogp)51015202530kˆβ−β∗k20.10.120.140.160.180.20.22p=200p=400p=800n/(slogp)51015202530kˆβ−β∗k20.150.20.250.30.350.4p=200p=400p=800n/(θp)345678kˆΓ−Γ∗kF0.40.60.811.21.4p=25p=30p=35n/(slogp)51015202530kˆβ−β∗k211.21.41.61.82p=200p=400p=800References
+[1] Sivaraman Balakrishnan, Martin J Wainwright, and Bin Yu. Statistical guarantees for the EM algorithm:
+
+From population to sample-based analysis. arXiv preprint arXiv:1408.2156, 2014.
+
+[2] T Tony Cai and Anru Zhang. Rop: Matrix recovery via rank-one projections. The Annals of Statistics,
+
+43(1):102–138, 2015.
+
+[3] Emmanuel Candes and Terence Tao. The Dantzig selector: statistical estimation when p is much larger
+
+than n. The Annals of Statistics, pages 2313–2351, 2007.
+
+[4] Emmanuel J Cand`es and Yaniv Plan. Tight oracle inequalities for low-rank matrix recovery from a min-
+imal number of noisy random measurements. Information Theory, IEEE Transactions on, 57(4):2342–
+2359, 2011.
+
+[5] Arun Tejasvi Chaganty and Percy Liang. Spectral experts for estimating mixtures of linear regressions.
+
+arXiv preprint arXiv:1306.3729, 2013.
+
+[6] Yudong Chen, Sujay Sanghavi, and Huan Xu. Improved graph clustering.
+
+Transactions on, 60(10):6440–6455, Oct 2014.
+
+Information Theory, IEEE
+
+[7] Yudong Chen, Xinyang Yi, and Constantine Caramanis. A convex formulation for mixed regression with
+
+two components: Minimax optimal rates. In Conf. on Learning Theory, 2014.
+
+[8] Arthur P Dempster, Nan M Laird, and Donald B Rubin. Maximum likelihood from incomplete data via
+
+the em algorithm. Journal of the royal statistical society. Series B (methodological), pages 1–38, 1977.
+
+[9] Po-Ling Loh and Martin J Wainwright. High-dimensional regression with noisy and missing data: Prov-
+able guarantees with non-convexity. In Advances in Neural Information Processing Systems, pages 2726–
+2734, 2011.
+
+[10] Po-Ling Loh and Martin J Wainwright. Corrupted and missing predictors: Minimax bounds for high-
+dimensional linear regression. In Information Theory Proceedings (ISIT), 2012 IEEE International Sym-
+posium on, pages 2601–2605. IEEE, 2012.
+
+[11] Jinwen Ma and Lei Xu. Asymptotic convergence properties of the em algorithm with respect to the
+
+overlap in the mixture. Neurocomputing, 68:105–129, 2005.
+
+[12] Geoffrey McLachlan and Thriyambakam Krishnan. The EM algorithm and extensions, volume 382. John
+
+Wiley & Sons, 2007.
+
+[13] Sahand Negahban, Martin J Wainwright, et al. Estimation of (near) low-rank matrices with noise and
+
+high-dimensional scaling. The Annals of Statistics, 39(2):1069–1097, 2011.
+
+[14] Sahand Negahban, Bin Yu, Martin J Wainwright, and Pradeep K Ravikumar. A uniﬁed framework for
+high-dimensional analysis of m-estimators with decomposable regularizers. In Advances in Neural Infor-
+mation Processing Systems, pages 1348–1356, 2009.
+
+[15] Benjamin Recht, Maryam Fazel, and Pablo A Parrilo. Guaranteed minimum-rank solutions of linear
+
+matrix equations via nuclear norm minimization. SIAM review, 52(3):471–501, 2010.
+
+[16] Nicolas St¨adler, Peter B¨uhlmann, and Sara Van De Geer. L1-penalization for mixture regression models.
+
+Test, 19(2):209–256, 2010.
+
+[17] Paul Tseng. An analysis of the em algorithm and entropy-like proximal point methods. Mathematics of
+
+Operations Research, 29(1):27–44, 2004.
+
+[18] Roman Vershynin.
+
+Introduction to the non-asymptotic analysis of random matrices. arXiv preprint
+
+arXiv:1011.3027, 2010.
+
+[19] Martin J Wainwright. Structured regularizers for high-dimensional problems: Statistical and computa-
+
+tional issues. Annual Review of Statistics and Its Application, 1:233–253, 2014.
+
+[20] Zhaoran Wang, Quanquan Gu, Yang Ning, and Han Liu. High dimensional expectation-maximization
+
+algorithm: Statistical optimization and asymptotic normality. arXiv preprint arXiv:1412.8729, 2014.
+
+[21] C.F.Jeff Wu. On the convergence properties of the em algorithm. The Annals of statistics, pages 95–103,
+
+1983.
+
+[22] Xinyang Yi, Constantine Caramanis, and Sujay Sanghavi. Alternating minimization for mixed linear
+
+regression. arXiv preprint arXiv:1310.3745, 2013.
+
+9
+
+

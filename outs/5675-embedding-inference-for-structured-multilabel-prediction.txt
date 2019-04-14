@@ -1,0 +1,977 @@
+Embedding Inference
+
+for Structured Multilabel Prediction
+
+Farzaneh Mirzazadeh Siamak Ravanbakhsh
+
+University of Alberta
+
+{mirzazad,mravanba}@ualberta.ca
+
+Nan Ding
+Google
+
+Dale Schuurmans
+University of Alberta
+
+dingnan@google.com
+
+daes@ualberta.ca
+
+Abstract
+
+A key bottleneck in structured output prediction is the need for inference dur-
+ing training and testing, usually requiring some form of dynamic programming.
+Rather than using approximate inference or tailoring a specialized inference
+method for a particular structure—standard responses to the scaling challenge—
+we propose to embed prediction constraints directly into the learned representa-
+tion. By eliminating the need for explicit inference a more scalable approach to
+structured output prediction can be achieved, particularly at test time. We demon-
+strate the idea for multi-label prediction under subsumption and mutual exclusion
+constraints, where a relationship to maximum margin structured output prediction
+can be established. Experiments demonstrate that the beneﬁts of structured output
+training can still be realized even after inference has been eliminated.
+
+1
+
+Introduction
+
+Structured output prediction has been an important topic in machine learning. Many prediction
+problems involve complex structures, such as predicting parse trees for sentences [28], predicting
+sequence labellings for language and genomic data [1], or predicting multilabel taggings for doc-
+uments and images [7, 8, 13, 20]. Initial breakthroughs in this area arose from tractable discrim-
+inative training methods—conditional random ﬁelds [19, 27] and structured large margin training
+[26, 29]—that compare complete output conﬁgurations against given target structures, rather than
+simply learning to predict each component in isolation. More recently, search based approaches that
+exploit sequential prediction methods have also proved effective for structured prediction [4, 21].
+Despite these improvements, the need to conduct inference or search over complex outputs both
+during the training and testing phase proves to be a signiﬁcant bottleneck in practice.
+In this paper we investigate an alternative approach that eliminates the need for inference or search
+at test time. The idea is to shift the burden of coordinating predictions to the training phase, by
+embedding constraints in the learned representation that ensure prediction relationships are satisﬁed.
+The primary beneﬁt of this approach is that prediction cost can be signiﬁcantly reduced without
+sacriﬁcing the desired coordination of structured output components.
+We demonstrate the proposed approach for the problem of multilabel classiﬁcation with hierarchi-
+cal and mutual exclusion constraints on output labels [8]. Multilabel classiﬁcation is an important
+subﬁeld of structured output prediction where multiple labels must be assigned that respect semantic
+relationships such as subsumption, mutual exclusion or weak forms of correlation. The problem is of
+growing importance as larger tag sets are being used to annotate images and documents on the Web.
+Research in this area can be distinguished by whether the relationships between labels are assumed
+to be known beforehand or whether such relationships need to be inferred during training. In the lat-
+ter case, many works have developed tailored training losses for multilabel prediction that penalize
+joint prediction behavior [6, 9, 30] without assuming any speciﬁc form of prior knowledge. More
+recently, several works have focused on coping with large label spaces by using low dimensional
+
+1
+
+projections to label subspaces [3, 17, 22]. Other work has focused on exploiting weak forms of prior
+knowledge expressed as similarity information between labels that can be obtained from auxiliary
+sources [11]. Unfortunately, none of these approaches strictly enforce prior logical relationships be-
+tween label predictions. By contrast, other research has sought to exploit known prior relationships
+between labels. The most prominent such approaches have been to exploit generative or conditional
+graphical model structures over the label set [5, 16]. Unfortunately, the graphical model structures
+are either limited to junction trees with small treewidth [5] or require approximation [12]. Other
+work, using output kernels, has also been shown able to model complex relationships between la-
+bels [15] but is hampered by an intractable pre-image problem at test time.
+In this paper, we focus on tractable methods and consider the scenario where a set of logical label
+relationships is given a priori; in particular, implication and mutual exclusion relationships. These
+relationships have been the subject of extensive work on multilabel prediction, where it is known
+that if the implication/subsumption relationships form a tree [25] or a directed acyclic graph [2, 8]
+then efﬁcient dynamic programming algorithms can be developed for tractable inference during
+training and testing, while for general pairwise models [32] approximate inference is required. Our
+main contribution is to show how these relationships can be enforced without the need for dynamic
+programming. The idea is to embed label relationships as constraints on the underlying score model
+during training so that a trivial labelling algorithm can be employed at test time, a process that can
+be viewed as pre-compiling inference during the training phase.
+The literature on multivariate prediction has considered many other topics not addressed by this
+paper, including learning from incomplete labellings, exploiting hierarchies and embeddings for
+multiclass prediction [31], exploiting multimodal data, deriving generalization bounds for structured
+and multilabel prediction problems, and investigating the consistency of multilabel losses.
+
+2 Background
+We consider a standard prediction model where a score function s : X × Y → R with parameters θ
+is used to determine the prediction for a given input x via
+
+ˆy = arg max
+
+y∈Y s(x, y).
+
+efﬁcient prediction. For example, s might decompose as s(x, y) = (cid:80)
+
+Here y is a conﬁguration of assignments over a set of components (that might depend on x). Since
+Y is a combinatorial set, (1) cannot usually be solved by enumeration; some structure required for
+c∈C s(x, yc) over a set of
+cliques C that form a junction tree, where yc denotes the portion of y covered by clique c. Y might
+also encode constraints to aid tractability, such as y forming a consistent matching in a bipartite
+graph, or a consistent parse tree [28]. The key practical requirement is that s and Y allow an efﬁcient
+solution to (1). The operation of maximizing or summing over all y ∈ Y is referred to as inference,
+and usually involves a dynamic program tailored to the speciﬁc structure encoded by s and Y.
+For supervised learning one attempts to infer a useful score function given a set of t training pairs
+(x1, y1), (x2, y2), ..., (xt, yt) that specify the correct output associated with each input. Conditional
+random ﬁelds [19] and structured large margin training (below with margin scaling) [28, 29] can both
+be expressed as optimizations over the score model parameters θ respectively:
+
+(cid:16)(cid:88)
+(cid:16)
+
+y∈Y
+
+t(cid:88)
+t(cid:88)
+
+i=1
+
+i=1
+
+min
+θ∈Θ
+
+r(θ) +
+
+min
+θ∈Θ
+
+r(θ) +
+
+(cid:17) − sθ(xi, yi)
+(cid:17) − sθ(xi, yi),
+
+log
+
+exp(sθ(xi, y))
+
+max
+y∈Y
+
+∆(y, yi) + sθ(xi, y)
+
+(1)
+
+(2)
+
+(3)
+
+where r(θ) is a regularizer over θ ∈ Θ. Equations (1), (2) and (3) suggest that inference over y ∈ Y
+is required at each stage of training and testing, however we show this is not necessarily the case.
+
+Multilabel Prediction To demonstrate how inference might be avoided, consider the special case
+of multilabel prediction with label constraints. Multilabel prediction specializes the previous set up
+by assuming y is a boolean assignment to a ﬁxed set of variables, where y = (y1, y2, ..., y(cid:96)) and
+yi ∈ {0, 1}, i.e. each label is assigned 1 (true) or 0 (false). As noted, an extensive literature that
+
+2
+
+has investigated various structural assumptions on the score function to enable tractable prediction.
+For simplicity we adopt the factored form that has been reconsidered in recent work [8, 11] (and
+
+originally [13]): s(x, y) =(cid:80)
+
+k s(x, yk). This form allows (1) to be simpliﬁed to
+
+ˆy = arg max
+y∈Y
+
+s(x, yk) = arg max
+y∈Y
+
+yksk(x)
+
+(4)
+
+(cid:88)
+
+k
+
+(cid:88)
+
+k
+
+where sk(x) := s(x, yk = 1) − s(x, yk = 0) gives the decision function associated with label
+yk ∈ {0, 1}. That is, based on (4), if the constraints in Y were ignored, one would have the
+relationship ˆyk = 1 ⇔ sk(x) ≥ 0. The constraints in Y play an important role however: it has been
+shown in [8] that imposing prior implications and mutual exclusions as constraints in Y yields state
+of the art accuracy results for image tagging on the ILSVRC corpus. This result was achieved in [8]
+by developing a novel and rather sophisticated dynamic program that can efﬁciently solve (4) under
+these constraints. Here we show how such a dynamic program can be eliminated.
+
+3 Embedding Label Constraints
+
+Consider the two common forms of logical relationships between labels: implication and mutual
+exclusion. For implication one would like to enforce relationships of the form y1 ⇒ y2, meaning
+that whenever the label y1 is set to 1 (true) then the label y2 must also be set to 1 (true). For mutual
+exclusion one would like to enforce relationships of the form ¬y1 ∨ ¬y2, meaning that at least one
+of the labels y1 and y2 must be set to 0 (false) (i.e., not both can be simultaneously true). These
+constraints arise naturally in multilabel classiﬁcation, where label sets are increasingly large and
+embody semantic relationships between categories [2, 8, 32]. For example, images can be tagged
+with labels “dog”, “cat” and “Siamese” where “Siamese” implies “cat”, while “dog” and “cat” are
+mutually exclusive (but an image could depict neither). These implication and mutual exclusion
+constraints constitute the “HEX” constraints considered in [8].
+Our goal is to express the logical relationships between label assignments as constraints on the score
+function that hold universally over all x ∈ X . In particular, using the decomposed representation
+(4), the desired label relationships correspond to the following constraints
+s1(x) ≥ −δ ⇒ s2(x) ≥ δ
+∀x ∈ X
+s1(x) < −δ or s2(x) < −δ ∀x ∈ X
+
+(5)
+(6)
+where we have introduced the additional margin quantity δ ≥ 0 for subsequent large margin training.
+
+Implication
+
+y1 ⇒ y2:
+Mutual exclusion ¬y1 ∨ ¬y2:
+
+3.1 Score Model
+
+The ﬁrst key consideration is representing the score function in a manner that allows the desired
+relationships to be expressed. Unfortunately, the standard linear form s(x, y) = (cid:104)θ, f (x, y)(cid:105) cannot
+allow the needed constraints to be enforced over all x ∈ X without further restricting the form
+of the feature representation f; a constraint we would like to avoid. More speciﬁcally, consider
+a standard set up where there is a mapping f (x, yk) that produces a feature representation for an
+input-label pair (x, yk). For clarity, we additionally make the standard assumption that the inputs
+and outputs each have independent feature representations [11], hence f (x, yk) = φ(x) ⊗ ψk for an
+input feature map φ and label feature representation ψk. In this case, a bi-linear score function has
+the form sk(x) = φ(x)(cid:62)Aψk + b(cid:62)φ(x) + c(cid:62)ψk + d for parameters θ = (A, b, c, d). Unfortunately,
+such a score function does not allow sk(x) ≥ δ (e.g., in Condition (5)) to be expressed over all
+x ∈ X without either assuming A = 0 and b = 0, or special structure in φ.
+To overcome this restriction we consider a more general scoring model that extends the standard
+bi-linear form to a form that is linear in the parameters but quadratic in the feature representations:
+
+(cid:34) φ(x)
+
+ψk
+1
+
+(cid:35)(cid:62) P
+
+A b
+A(cid:62) Q c
+b(cid:62) c(cid:62) r
+
+(cid:35)
+
+(cid:34) φ(x)
+
+ψk
+1
+
+ P
+
+A b
+A(cid:62) Q c
+b(cid:62) c(cid:62) r
+
+ . (7)
+
+for
+
+θ =
+
+−sk(x) =
+
+Here θ = θ(cid:62) and sk is linear in θ for each k. The beneﬁt of a quadratic form in the features is that
+it allows constraints over x ∈ X to be easily imposed on label scores via convex constraints on θ.
+
+3
+
+Lemma 1 If θ (cid:23) 0 then −sk(x) = (cid:107)U φ(x) + u − V ψk(cid:107)2 for some U, V and u.
+Proof: First expand (7), obtaining −sk(x) = φ(x)(cid:62)P φ(x) + 2φ(x)(cid:62)Aψk + 2b(cid:62)φ(x) + ψ(cid:62)
+k Qψk +
+2c(cid:62)ψk + r. Since θ (cid:23) 0 there must exist U, V and u such that θ = [U(cid:62),−V (cid:62), u](cid:62)[U(cid:62),−V (cid:62), u],
+where U(cid:62)U = P , U(cid:62)V = −A, U(cid:62)u = b, V (cid:62)V = Q, V (cid:62)u = −c, and u(cid:62)u = r. A simple
+(cid:4)
+substitution and rearrangement shows the claim.
+The representation (7) generalizes both standard bi-linear and distance-based models. The standard
+bi-linear model is achieved by P = 0 and Q = 0. By Lemma 1, the semideﬁnite assumption θ (cid:23) 0
+also yields a model that has a co-embedding [24] interpretation: the feature representations φ(x)
+and ψk are both mapped (linearly) into a common Euclidean space where the score is determined
+by the squared distance between the embedded vectors (with an additional offset u). To aid the
+presentation below we simplify this model a bit further. Set b = 0 and observe that (7) reduces to
+
+(cid:20) φ(x)
+
+(cid:21)(cid:62)(cid:20) P A
+
+(cid:21)(cid:20) φ(x)
+
+(cid:21)
+
+sk(x) = γk −
+
+(8)
+where γk = −r − 2c(cid:62)ψk. In particular, we modify the parameterization to θ = {γk}(cid:96)
+k=1 ∪{θP AQ}
+such that θP AQ denotes the matrix of parameters in (8). Importantly, (8) remains linear in the new
+parameterization. Lemma 1 can then be modiﬁed accordingly for a similar convex constraint on θ.
+Lemma 2 If θP AQ (cid:23) 0 then there exist U and V such that for all labels k and l
+
+A(cid:62) Q
+
+ψk
+
+ψk
+
+k Qψk − ψ(cid:62)
+ψ(cid:62)
+
+k Qψl − ψ(cid:62)
+
+l Qψk + ψ(cid:62)
+
+sk(x) = γk − (cid:107)U φ(x) − V ψk(cid:107)2
+l Qψl = (cid:107)V ψk − V ψl(cid:107)2.
+
+(9)
+(10)
+
+Similar to Lemma 1, since θP AQ (cid:23) 0,
+
+Proof:
+there exist U and V such that θP AQ =
+[U(cid:62),−V (cid:62)](cid:62)[U(cid:62),−V (cid:62)] where U(cid:62)U = P , V (cid:62)V = Q and U(cid:62)V = −A. Expanding (8) and sub-
+l Qψl = (ψk − ψl)(cid:62)Q(ψk − ψl).
+stituting gives (9). For (10) note ψ(cid:62)
+l Qψk + ψ(cid:62)
+Expanding Q gives (ψk − ψl)(cid:62)Q(ψk − ψl) = (ψk − ψl)(cid:62)V (cid:62)V (ψk − ψl) = (cid:107)V ψk − V ψl(cid:107)2. (cid:4)
+This representation now allows us to embed the desired label relationships as simple convex con-
+straints on the score model parameters θ.
+
+k Qψk − ψ(cid:62)
+
+k Qψl − ψ(cid:62)
+
+3.2 Embedding Implication Constraints
+Theorem 3 Assume the quadratic-linear score model (8) and θP AQ (cid:23) 0. Then for any δ ≥ 0 and
+α > 0, the implication constraint in (5) is implied for all x ∈ X by:
+2 Qψ1 + ψ(cid:62)
+2 Qψ1 + ψ(cid:62)
+
+(11)
+(12)
+Proof: First, since θP AQ (cid:23) 0 we have the relationship (10), which implies that there must exist
+2 Qψ2 = (cid:107)ν1 − ν2(cid:107)2.
+vectors ν1 = V ψ1 and ν2 = V ψ2 such that ψ(cid:62)
+Therefore, the constraints (11) and (12) can be equivalently re-expressed as
+
+2 Qψ2) ≤ γ2 − δ
+2 Qψ2) ≥ γ1 + δ.
+
+γ1 + δ + (1 + α)(ψ(cid:62)
+(ψ(cid:62)
+
+1 Qψ1 − ψ(cid:62)
+1 Qψ1 − ψ(cid:62)
+
+1 Qψ2 − ψ(cid:62)
+1 Qψ2 − ψ(cid:62)
+
+2 Qψ1 + ψ(cid:62)
+
+(cid:0) α
+
+(cid:1)2
+
+2
+
+1 Qψ1 − ψ(cid:62)
+
+1 Qψ2 − ψ(cid:62)
+γ1 + δ + (1 + α)(cid:107)ν1 − ν2(cid:107)2 ≤ γ2 − δ
+
+(cid:1)2 (cid:107)ν1 − ν2(cid:107)2 ≥ γ1 + δ
+
+(cid:0) α
+
+2
+
+(13)
+(14)
+
+(15)
+
+with respect to these vectors. Next let µ(x) := U φ(x) (which exists by (9)) and observe that
+
+(cid:107)µ(x) − ν2(cid:107)2 = (cid:107)µ(x) − ν1 + ν1 − ν2(cid:107)2
+
+= (cid:107)µ(x) − ν1(cid:107)2 + (cid:107)ν1 − ν2(cid:107)2 + 2(cid:104)µ(x) − ν1, ν1 − ν2(cid:105),
+
+Consider two cases.
+Case 1: 2(cid:104)µ(x) − ν1, ν1 − ν2(cid:105) > α(cid:107)ν1 − ν2(cid:107)2. In this case, by the Cauchy Schwarz inequality we
+have 2(cid:107)µ(x)− ν1(cid:107)(cid:107)ν1− ν2(cid:107) ≥ 2(cid:104)µ(x)− ν1, ν1− ν2(cid:105) > α(cid:107)ν1− ν2(cid:107)2, which implies (cid:107)µ(x)− ν1(cid:107) >
+that s1(x) < −δ therefore it does not matter what value s2(x) has.
+
+(cid:1)2 (cid:107)ν1 − ν2(cid:107)2 ≥ γ1 + δ by constraint (14). But this implies
+
+2 (cid:107)ν1 − ν2(cid:107), hence (cid:107)µ(x) − ν1(cid:107)2 >(cid:0) α
+
+α
+
+2
+
+4
+
+Case 2: 2(cid:104)µ(x) − ν1, ν1 − ν2(cid:105) ≤ α(cid:107)ν1 − ν2(cid:107)2.
+In this case, assume that s1(x) ≥ −δ, i.e.
+(cid:107)µ(x) − ν1(cid:107)2 ≤ γ1 + δ, otherwise it does not matter what value s2(x) has. Then from (15) it fol-
+lows that (cid:107)µ(x)− ν2(cid:107)2 ≤ (cid:107)µ(x)− ν1(cid:107)2 +(1 + α)(cid:107)ν1− ν2(cid:107)2 ≤ γ1 + δ +(1 + α)(cid:107)ν1− ν2(cid:107)2 ≤ γ2− δ
+by constraint (13). But this implies that s2(x) ≥ δ, hence the implication is enforced.
+(cid:4)
+
+3.3 Embedding Mutual Exclusion Constraints
+Theorem 4 Assume the quadratic-linear score model (8) and θP AQ (cid:23) 0. Then for any δ ≥ 0 the
+mutual exclusion constraint in (6) is implied for all x ∈ X by:
+
+1
+
+2 (ψ(cid:62)
+
+1 Qψ1 − ψ(cid:62)
+
+1 Qψ2 − ψ(cid:62)
+
+2 Qψ1 + ψ(cid:62)
+
+(16)
+Proof: As before, since θP AQ (cid:23) 0 we have the relationship (10), which implies that there must exist
+2 Qψ2 = (cid:107)ν1 − ν2(cid:107)2.
+1 Qψ2 − ψ(cid:62)
+vectors ν1 = V ψ1 and ν2 = V ψ2 such that ψ(cid:62)
+Observe that the constraint (16) can then be equivalently expressed as
+2(cid:107)ν1 − ν2(cid:107)2 > γ1 + γ2 + 2δ,
+
+2 Qψ2) > γ1 + γ2 + 2δ.
+
+1 Qψ1 − ψ(cid:62)
+
+2 Qψ1 + ψ(cid:62)
+
+(17)
+
+1
+
+and observe that
+
+(cid:107)ν1 − ν2(cid:107)2 = (cid:107)ν1 − µ(x) + µ(x) − ν2(cid:107)2
+
+= (cid:107)ν1 − µ(x)(cid:107)2 + (cid:107)µ(x) − ν2(cid:107)2 + 2(cid:104)ν1 − µ(x), µ(x) − ν2(cid:105)
+
+(18)
+
+using µ(x) := U φ(x) as before (which exists by (9)). Therefore
+
+(cid:107)µ(x) − ν1(cid:107)2 + (cid:107)µ(x) − ν2(cid:107)2 = (cid:107)ν1 − ν2(cid:107)2 − 2(cid:104)ν1 − µ(x), µ(x) − ν2(cid:105)
+
+1
+
+2(cid:107)(ν1 − µ(x)) + (µ(x) − ν2)(cid:107)2
+2(cid:107)ν1 − ν2(cid:107)2.
+
+= (cid:107)(ν1−µ(x))+(µ(x)−ν2)(cid:107)2 − 2(cid:104)ν1−µ(x), µ(x)−ν2(cid:105) (19)
+≥ 1
+(20)
+(21)
+= 1
+2(cid:107)a(cid:107)2 +
+2(cid:107)a − b(cid:107)2, we must have (cid:104)a, b(cid:105) ≤ 1
+(To prove the inequality (20) observe that, since 0 ≤ 1
+2(cid:107)b(cid:107)2, hence 2(cid:104)a, b(cid:105) ≤ 1
+2(cid:107)b(cid:107)2 + (cid:104)a, b(cid:105) = 1
+2(cid:107)a + b(cid:107)2, which establishes −2(cid:104)a, b(cid:105) ≥
+2(cid:107)a + b(cid:107)2. The inequality (20) then follows simply by setting a = ν1 − µ(x) and b = µ(x)− ν2.)
+− 1
+Now combining (21) with the constraint (17) implies that (cid:107)µ(x) − ν1(cid:107)2 + (cid:107)µ(x) − ν2(cid:107)2 ≥
+2(cid:107)ν1 − ν2(cid:107)2 > γ1 + γ2 + 2δ, therefore one of (cid:107)µ(x) − ν1(cid:107)2 > γ1 + δ or (cid:107)µ(x) − ν2(cid:107)2 > γ2 + δ
+must hold, hence at least one of s1(x) < −δ or s2(x) < −δ must hold. Therefore, the mutual
+(cid:4)
+exclusion is enforced.
+
+2(cid:107)a(cid:107)2 + 1
+
+1
+
+Importantly, once θP AQ (cid:23) 0 is imposed, the other constraints in Theorems 3 and 4 are all linear in
+the parameters Q and γ.
+
+4 Properties
+
+We now establish that the above constraints on the parameters in (8) achieve the desired properties.
+In particular, we show that given the constraints, inference can be removed both from the prediction
+problem (4) and from structured large margin training (3).
+
+4.1 Prediction Equivalence
+
+First note that the decision of whether a label yk is associated with x can be determined by
+s(x, yk = 1) > s(x, yk = 0) ⇔ max
+(22)
+yk∈{0,1} yksk(x).
+Consider joint assignments y = (y1, ..., yl) ∈ {0, 1}l and let Y denote the set of joint assignments
+that are consistent with a set of implication and mutual exclusion constraints. (It is assumed the
+constraints are satisﬁable; that is, Y is not the empty set.) Then the optimal joint assignment for a
+
+yk∈{0,1} yksk(x) > 0 ⇔ 1 = arg max
+
+given x can be speciﬁed by arg maxy∈Y(cid:80)l
+
+k=1 yksk(x).
+
+5
+
+(23)
+
+(24)
+
+Proposition 5 If the constraint set Y imposes the constraints in (5) and (6) (and is nonempty), and
+the score function s satisﬁes the corresponding constraints for some δ > 0, then
+
+l(cid:88)
+
+l(cid:88)
+
+max
+y∈Y
+
+yksk(x) =
+
+k=1
+
+k=1
+
+max
+
+yk
+
+yksk(x)
+
+Proof: First observe that
+
+l(cid:88)
+
+k=1
+
+max
+y∈Y
+
+yksk(x) ≤ max
+
+y
+
+l(cid:88)
+
+k=1
+
+yksk(x) =
+
+l(cid:88)
+
+k=1
+
+max
+
+yk
+
+yksk(x)
+
+so making local classiﬁcations for each label gives an upper bound. However, if the score function
+satisﬁes the constraints, then the concatenation of the local label decisions y = (y1, ..., yl) must
+be jointly feasible; that is, y ∈ Y. In particular, for the implication y1 ⇒ y2 the score constraint
+(5) ensures that if s1(x) > 0 ≥ −δ (implying 1 = arg maxy1 y1s1(x)) then it must follow
+that s2(x) ≥ δ, hence s2(x) > 0 (implying 1 = arg maxy2 y2s2(x)). Similarly, for the mutual
+exclusion ¬y1 ∨ ¬y2 the score constraint (6) ensures min(s1(x), s2(x)) < −δ ≤ 0, hence if
+s1(x) > 0 ≥ −δ (implying 1 = arg maxy1 y1s1(x)) then it must follow that s2(x) < −δ ≤ 0
+(implying 0 = arg maxy2 y2s2(x)), and vice versa. Therefore, since the maximizer y of (24) is
+(cid:4)
+feasible, we actually have that the leftmost term in (24) is equal to the rightmost.
+
+Since the feasible set Y embodies non-trivial constraints over assignment vectors in (23), interchang-
+ing maximization with summation is not normally justiﬁed. However, Proposition 5 establishes that,
+if the score model also satisﬁes its respective constraints (e.g., as established in the previous section),
+then maximization and summation can be interchanged, and inference over predicted labellings can
+be replaced by greedy componentwise labelling, while preserving equivalence.
+
+4.2 Re-expressing Large Margin Structured Output Training
+Given a target joint assignment over labels t = (t1, ..., tl) ∈ {0, 1}l, and using the score model (8),
+the standard structured output large margin training loss (3) can then be written as
+
+l(cid:88)
+
+max
+y∈Y ∆(y, ti) +
+
+(cid:88)
+∆(y, ti) =(cid:80)l
+
+s(xi, yk) − s(xi, tik) =
+
+max
+y∈Y ∆(y, ti) +
+
+(yk − tik)sk(xi), (25)
+
+k=1
+
+i
+using the simpliﬁed score function representation such that tik denotes the k-th label of the i-th
+training example. If we furthermore make the standard assumption that ∆(y, ti) decomposes as
+
+k=1
+
+i
+
+k=1 δk(yk, tik), the loss can be simpliﬁed to
+
+(cid:88)
+
+l(cid:88)
+
+δk(yk, tik) + (yk − tik)sk(xi).
+
+(26)
+
+(cid:88)
+
+i
+
+max
+y∈Y
+
+l(cid:88)
+
+k=1
+
+Note also that since yk ∈ {0, 1} and tik ∈ {0, 1} the margin functions δk typically have the form
+δk(0, 0) = δk(1, 1) = 0 and δk(0, 1) = δk01 and δk(1, 0) = δk10 for constants δk01 and δk10, which
+for simplicity we will assume are equal, δk01 = δk10 = δ for all k (although label speciﬁc margins
+might be possible). This is the same δ used in the constraints (5) and (6).
+The difﬁculty in computing this loss is that it apparently requires an exponential search over y. When
+this exponential search can be avoided, it is normally avoided by developing a dynamic program.
+Instead, we can now see that the search over y can be eliminated.
+
+Proposition 6 If the score function s satisﬁes the constraints in (5) and (6) for δ > 0, then
+
+δ(yk, tik) + (yk − tik)sk(xi).(27)
+
+max
+
+yk
+
+l(cid:88)
+
+(cid:88)
+
+i
+
+max
+y∈Y
+
+(cid:88)
+
+l(cid:88)
+
+δ(yk, tik) + (yk − tik)sk(xi) =
+
+k=1
+
+i
+
+k=1
+
+6
+
+For a given x and t ∈ Y,
+
+Proof:
+arg maxy∈{0,1} fk(y). It is easy to show that
+
+let fk(y) = δ(y, tk) + (y − tk)sk(x), hence yk =
+
+1 ∈ arg max
+
+y∈{0,1} fk(y) ⇐⇒ sk(x) ≥ tkδ − (1 − tk)δ,
+
+(28)
+
+which can be veriﬁed by checking the two cases, tk = 0 and tk = 1. When tk = 0 we have fk(0) =
+0 and fk(1) = δ + s(x), therefore 1 = yk ∈ arg maxy∈{0,1} fk(y) iff δ + s(x) ≥ 0. Similarly,
+when tk = 1 we have fk(0) = δ − s(x) and fk(1) = 0, therefore 1 = yk ∈ arg maxy∈{0,1} fk(y)
+iff δ − s(x) ≤ 0. Combining these two conditions yields (28).
+Next, we verify that if the score constraints hold, then the logical constraints over y are automatically
+satisﬁed even by locally assigning yk, which implies the optimal joint assignment is feasible, i.e.
+y ∈ Y, establishing the claim. In particular, for the implication y1 ⇒ y2, it is assumed that t1 ⇒ t2
+in the target labeling and also that score constraints hold, ensuring s1(x) ≥ −δ ⇒ s2(x) ≥ δ.
+Consider the cases over possible assignments to t1 and t2:
+If t1 = 0 and t2 = 0 then y1 = 1 ⇒ f1(1) ≥ f1(0) ⇒ δ + s1(x) ≥ 0 ⇒ s1(x) ≥ −δ ⇒ s2(x) ≥ δ
+(by assumption) ⇒ s2(x) ≥ −δ ⇒ δ + s2(x) ≥ 0 ⇒ f2(1) ≥ f2(0) ⇒ y2 = 1.
+If t1 = 0 and t2 = 1 then y1 = 1 ⇒ f1(1) ≥ f1(0) ⇒ δ + s1(x) ≥ 0 ⇒ s1(x) ≥ −δ ⇒ s2(x) ≥ δ
+(by assumption) ⇒ 0 ≥ δ − s2(x) ⇒ f2(1) ≥ f2(0) ⇒ y2 = 1 (tight case).
+The case t1 = 1 and t2 = 0 cannot happen by the assumption that t ∈ Y.
+If t1 = 1 and t2 = 1 then y1 = 1 ⇒ f1(1) ≥ f1(0) ⇒ 0 ≥ δ − s1(x) ⇒ s1(x) ≥ −δ ⇒ s2(x) ≥ δ
+(by assumption) ⇒ 0 ≥ δ − s2(x) ⇒ f2(1) ≥ f2(0) ⇒ y2 = 1.
+Similarly, for the mutual exclusion ¬y1 ∨ ¬y2, it is assumed that ¬t1 ∨ ¬t2 in the target labeling
+and also that the score constraints hold, ensuring min(s1(x), s2(x)) < −δ. Consider the cases over
+possible assignments to t1 and t2:
+If t1 = 0 and t2 = 0 then y1 = 1 and y2 = 1 implies that s1(x) ≥ −δ and s2(x) ≥ −δ, which
+contradicts the constraint that min(s1(x), s2(x)) < −δ (tight case).
+If t1 = 0 and t2 = 1 then y1 = 1 and y2 = 1 implies that s1(x) ≥ −δ and s2(x) ≥ δ, which
+contradicts the same constraint.
+If t1 = 1 and t2 = 0 then y1 = 1 and y2 = 1 implies that s1(x) ≥ δ and s2(x) ≥ −δ, which again
+contradicts the same constraint.
+The case t1 = 1 and t2 = 1 cannot happen by the assumption that t ∈ Y.
+Therefore, since the concatenation, y, of the independent maximizers of (27) is feasible, i.e. y ∈ Y,
+(cid:4)
+we have that the rightmost term in (27) equals the leftmost.
+Similar to Section 4.1, Proposition 6 demonstrates that if the constraints (5) and (6) are satisﬁed
+by the score model s, then structured large margin training (3) reduces to independent labelwise
+training under the standard hinge loss, while preserving equivalence.
+
+5 Efﬁcient Implementation
+
+2
+
+Even though Section 3 achieves the primary goal of demonstrating how desired label relationships
+can be embedded as convex constraints on score model parameters, the linear-quadratic represen-
+tation (8) unfortunately does not allow convenient scaling: the number of parameters in θP AQ (8)
+
+(cid:1) (accounting for symmetry), which is quadratic in the number of features, n, in φ and the
+
+is(cid:0)n+(cid:96)
+
+number of labels, (cid:96). Such a large optimization variable is not practical for most applications, where
+n and (cid:96) can be quite large. The semideﬁnite constraint θP AQ (cid:23) 0 can also be costly in practice.
+Therefore, to obtain scalable training we require some further reﬁnement.
+In our experiments below we obtained a scalable training procudure by exploiting trace norm reg-
+ularization on θP AQ to reduce its rank. The key beneﬁt of trace norm regularization is that efﬁ-
+cient solution methods exist that work with a low rank factorization of the matrix variable while
+automatically ensuring positive semideﬁniteness and still guaranteeing global optimality [10, 14].
+Therefore, we conducted the main optimization in terms of a smaller matrix variable B such that
+BB(cid:62) = θP AQ. Second, to cope with the constraints, we employed an augmented Lagrangian
+method that increasingly penalizes constraint violations, but otherwise allows simple unconstrained
+optimization. All optimizations for smooth problems were performed using LBFGS and nonsmooth
+problems were solved using a bundle method [23].
+
+7
+
+Dataset
+Enron
+WIPO
+Reuters
+
+% test error
+unconstrained
+constrained
+inference
+
+Features Labels Depth
+4
+5
+5
+
+1001
+74435
+47235
+
+57
+183
+103
+
+# Training
+988
+1352
+3000
+
+Table 1: Data set properties
+
+# Testing Reference
+
+660
+358
+3000
+
+[18]
+[25]
+[20]
+
+Enron WIPO Reuters
+27.1
+4.0
+29.3
+
+21.0
+2.6
+2.7
+
+12.4
+9.8
+6.8
+
+test time (s)
+unconstrained
+constrained
+inference
+
+Enron WIPO Reuters
+0.054
+0.60
+0.60
+0.054
+0.481
+5.20
+
+0.070
+0.070
+0.389
+
+Table 2: (left) test set prediction error (percent); (right) test set prediction time (s)
+
+6 Experimental Evaluation
+
+To evaluate the proposed approach we conducted experiments on multilabel text classiﬁcation data
+that has a natural hierarchy deﬁned over the label set. In particular, we investigated three multi-
+label text classiﬁcation data sets, Enron, WIPO and Reuters, obtained from https://sites.
+google.com/site/hrsvmproject/datasets-hier (see Table 1 for details). Some pre-
+processing was performed on the label relations to ensure consistency with our assumptions. In
+particular, all implications were added to each instance to ensure consistency with the hierarchy,
+while mutual exclusions were deﬁned between siblings whenever this did not create a contradiction.
+We conducted experiments to compare the effects of replacing inference with the constraints outlined
+in Section 3, using the score model (8). For comparison, we trained using the structured large margin
+formulation (3), and trained under a multilabel prediction loss without inference, but both including
+then excluding the constraints. For the multilabel training loss we used the smoothed calibrated
+separation ranking loss proposed in [24]. In each case, the regularization parameter was simply set
+to 1. For inference, we implemented the inference algorithm outlined in [8].
+The results are given in Table 2, showing both the test set prediction error (using labelwise prediction
+error, i.e. Hamming loss) and the test prediction times. As expected, one can see beneﬁts from
+incorporating known relationships between the labels when training a predictor. In each case, the
+addition of constraints leads to a signiﬁcant improvement in test prediction error, versus training
+without any constraints or inference added. Training with inference (i.e., classical structured large
+margin training) still proves to be an effective training method overall, in one case improving the
+results over the constrained approach, but in two other cases falling behind. The key difference
+between the approach using constraints versus that using inference is in terms of the time it takes
+to produce predictions on test examples. Using inference to make test set predictions clearly takes
+signiﬁcantly longer than applying labelwise predictions from either a constrained or unconstrained
+model, as shown in the right subtable of Table 2.
+
+7 Conclusion
+
+We have demonstrated a novel approach to structured multilabel prediction where inference is re-
+placed with constraints on the score model. On multilabel text classiﬁcation data, the proposed
+approach does appear to be able to achieve competitive generalization results, while reducing the
+time needed to make predictions at test time. In cases where logical relationships are known to
+hold between the labels, using either inference or imposing constraints on the score model appear to
+yield beneﬁts over generic training approaches that ignore the prior knowledge. For future work we
+are investigating extensions of the proposed approach to more general structured output settings, by
+combining the method with search based prediction methods. Other interesting questions include
+exploiting learned label relations and coping with missing labels.
+
+8
+
+References
+[1] G. Bakir, T. Hofmann, B. Sch¨olkopf, A. Smola, B. Taskar, and S. Vishwanathan. Predicting Structured
+
+Data. MIT Press, 2007.
+
+[2] W. Bi and J. Kwok. Mandatory leaf node prediction in hierarchical multilabel classiﬁcation. In Neural
+
+Information Processing Systems (NIPS), 2012.
+
+[3] M. Ciss´e, N. Usunier, T. Artieres, and P. Gallinari. Robust bloom ﬁlters for large multilabel classiﬁcation
+
+tasks. In Proceedings of Advances in Neural Information Processing Systems (NIPS), 2013.
+
+[4] H. Daume and J. Langford. Search-based structured prediction. Machine Learning, 75:297–325, 2009.
+[5] K. Dembczy´nski, W. Cheng, and E. H¨ullermeier. Bayes optimal multilabel classiﬁcation via probabilistic
+
+classiﬁer chains. In Proceedings ICML, 2010.
+
+[6] K. Dembczy´nski, W. Waegeman, W. Cheng, and E. H¨ullermeier. On label dependence and loss minimiza-
+
+tion in multi-label classiﬁcation. Machine Learning, 88(1):5–45, 2012.
+
+[7] J. Deng, A. Berg, K. Li, and F. Li. What does classifying more than 10,000 image categories tell us? In
+
+Proceedings of the European Conference on Computer Vision (ECCV), 2010.
+
+[8] J. Deng, N. Ding, Y. Jia, A. Frome, K. Murphy, S. Bengio, Y. Li, H. Neven, and H. Adam. Large-scale
+
+object classiﬁcation using label relation graphs. In Proceedings ECCV, 2014.
+
+[9] Y. Guo and D. Schuurmans. Adaptive large margin training for multilabel classiﬁcation. In AAAI, 2011.
+[10] B. Haeffele, R. Vidal, and E. Young. Structured low-rank matrix factorization: Optimality, algorithm, and
+
+applications to image processing. In International Conference on Machine Learning (ICML), 2014.
+
+[11] B. Hariharan, S.V.N. Vishwanathan, and M. Varma. Efﬁcient max-margin multi-label classiﬁcation with
+
+applications to zero-shot learning. Machine Learning, 88:127–155, 2012.
+
+[12] J. Jancsary, S. Nowozin, and C. Rother. Learning convex QP relaxations for structured prediction. In
+
+Proceedings of the International Conference on Machine Learning (ICML), 2013.
+
+[13] T. Joachims. Transductive inference for text classiﬁcation using support vector machines. In ICML, 1999.
+[14] M. Journ´ee, F. Bach, P. Absil, and R. Sepulchre. Low-rank optimization on the cone of positive semidef-
+
+inite matrices. SIAM Journal on Optimization, 20(5):2327–2351, 2010.
+
+[15] H. Kadri, M. Ghavamzadeh, and P. Preux. A generalized kernel approach to structured output learning.
+
+In Proceedings of the International Conference on Machine Learning (ICML), 2013.
+
+[16] A. Kae, K. Sohn, H. Lee, and E. Learned-Miller. Augmenting CRFs with Boltzmann machine shape
+
+priors for image labeling. In Proceedings CVPR, 2013.
+
+[17] A. Kapoor, P. Jain, and R. Vishwanathan. Multilabel classiﬁcation using Bayesian compressed sensing.
+
+In Proceedings of Advances in Neural Information Processing Systems (NIPS), 2012.
+
+[18] B. Klimt and Y. Yang. The Enron corpus: A new dataset for email classiﬁcation. In ECML, 2004.
+[19] J. Lafferty, A. McCallum, and F. Pereira. Conditional random ﬁelds: Probabilistic models for segmenting
+
+and labeling sequence data. In International Conference on Machine Learning (ICML), 2001.
+
+[20] D. Lewis, Y. Yang, T. Rose, and F. Li. RCV1: A new benchmark collection for text categorization
+
+research. Journal of Machine Learning Research, 5:361–397, 2004.
+
+[21] Q. Li, J. Wang, D. Wipf, and Z. Tu. Fixed-point model for structured prediction. In Proceedings of the
+
+International Conference on Machine Learning (ICML), 2013.
+
+[22] Z. Lin, G. Ding, M. Hu, and J. Wang. Multi-label classiﬁcation via feature-aware implicit label space
+
+encoding. In Proceedings of the International Conference on Machine Learning (ICML), 2014.
+
+[23] M. M¨akel¨a. Multiobjective proximal bundle method for nonconvex nonsmooth optimization: Fortran
+
+subroutine MPBNGC 2.0. Technical report, U. of Jyv¨askyk¨a, 2003.
+
+[24] F. Mirzazadeh, Y. Guo, and D. Schuurmans. Convex co-embedding. In Proceedings AAAI, 2014.
+[25] J. Rousu, C. Saunders, S. Szedmak, and J. Shawe-Taylor. Kernel-based learning of hierarchical multilabel
+
+classiﬁcation models. Journal of Machine Learning Research, 7:1601–1626, 2006.
+
+[26] V. Srikumar and C. Manning. Learning distributed representations for structured output prediction. In
+
+Proceedings of Advances in Neural Information Processing Systems (NIPS), 2014.
+
+[27] X. Sun. Structure regularization for structured prediction. In Proceedings NIPS, 2014.
+[28] B. Taskar. Learning structured prediction models: A large margin approach. PhD thesis, Stanford, 2004.
+[29] I. Tsochantaridis, T. Hofmann, T. Joachims, and Y. Altun. Large margin methods for structured and
+
+interdependent output variables. Journal of Machine Learning Research, 6:1453–1484, 2005.
+
+[30] G. Tsoumakas, I. Katakis, and I. Vlahavas. Mining multi-label data. In Data Mining and Knowledge
+
+Discovery Handbook, 2nd edition. Springer, 2009.
+
+[31] K. Weinberger and O. Chapelle. Large margin taxonomy embedding for document categorization. In
+
+Neural Information Processing Systems (NIPS), 2008.
+
+[32] J. Weston, S. Bengio, and N. Usunier. WSABIE: scaling up to large vocabulary image annotation. In
+
+International Joint Conference on Artiﬁcial Intelligence (IJCAI), 2011.
+
+9
+
+

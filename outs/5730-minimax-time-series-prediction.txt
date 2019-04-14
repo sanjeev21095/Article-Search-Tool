@@ -1,0 +1,1171 @@
+Minimax Time Series Prediction
+
+Wouter M. Koolen
+
+Centrum Wiskunde & Informatica
+
+wmkoolen@cwi.nl
+
+Alan Malek
+UC Berkeley
+
+malek@berkeley.edu
+
+Peter L. Bartlett
+
+UC Berkeley & QUT
+
+bartlett@cs.berkeley.edu
+
+Yasin Abbasi-Yadkori
+
+Queensland University of Technology
+
+yasin.abbasiyadkori@qut.edu.au
+
+Abstract
+
+We consider an adversarial formulation of the problem of predicting a time series
+with square loss. The aim is to predict an arbitrary sequence of vectors almost
+as well as the best smooth comparator sequence in retrospect. Our approach al-
+lows natural measures of smoothness such as the squared norm of increments.
+More generally, we consider a linear time series model and penalize the compara-
+tor sequence through the energy of the implied driving noise terms. We derive
+the minimax strategy for all problems of this type and show that it can be imple-
+mented efﬁciently. The optimal predictions are linear in the previous observations.
+We obtain an explicit expression for the regret in terms of the parameters deﬁning
+the problem. For typical, simple deﬁnitions of smoothness, the computation of the
+optimal predictions involves only sparse matrices. In the case of norm-constrained
+data, where the smoothness is deﬁned in terms of the squared norm of the com-
+parator’s increments, we show that the regret grows as T /
+λT , where T is the
+length of the game and λT is an increasing limit on comparator smoothness.
+
+√
+
+1
+
+Introduction
+
+In time series prediction, tracking, and ﬁltering problems, a learner sees a stream of (possibly noisy,
+vector-valued) data and needs to predict the future path. One may think of robot poses, meteo-
+rological measurements, stock prices, etc. Popular stochastic models for such tasks include the
+auto-regressive moving average (ARMA) model in time series analysis, Brownian motion models in
+ﬁnance, and state space models in signal processing.
+In this paper, we study the time series prediction problem in the regret framework; instead of mak-
+ing assumptions on the data generating process, we ask: can we predict the data sequence online
+almost as well as the best ofﬂine prediction method in some comparison class (in this case, ofﬂine
+means that the comparator only needs to model the data sequence after seeing all of it)? Our main
+contribution is computing the exact minimax strategy for a range of time series prediction problems.
+As a concrete motivating example, let us pose the simplest nontrivial such minimax problem
+
+min
+a1
+
+max
+x1∈B
+
+··· min
+
+aT
+
+max
+xT ∈B
+
+(cid:107)at − xt(cid:107)2
+
+− min
+
+ˆa1,...,ˆaT
+
+(cid:123)(cid:122)
+
+(cid:125)
+
+(cid:107)ˆat − xt(cid:107)2
+
++ λT
+
+(cid:125)
+
+(cid:124)
+
+(cid:123)(cid:122)
+
+Loss of Learner
+
+Loss of Comparator
+
+(1)
+This notion of regret is standard in online learning, going back at least to [1] in 2001, which views it
+as the natural generalization of L2 regularization to deal with non-stationarity comparators. We offer
+two motivations for this regularization. First, one can interpret the complexity term as the magnitude
+
+(cid:41)
+
+.
+
+T +1(cid:88)
+(cid:107)ˆat − ˆat−1(cid:107)2
+(cid:123)(cid:122)
+(cid:125)
+
+t=1
+
+Comparator Complexity
+
+T(cid:88)
+(cid:124)
+
+t=1
+
+(cid:40) T(cid:88)
+(cid:124)
+
+t=1
+
+1
+
+of the noise required to generate the comparator using a multivariate Gaussian random walk, and,
+generalizing slightly, as the energy of the innovations required to model the comparator using a
+single, ﬁxed linear time series model (e.g. speciﬁc ARMA coefﬁcients). Second, we can view the
+comparator term in Equation (1) as akin to the Lagrangian of a constrained optimization problem.
+Rather than competing with the comparator sequence ˆa1, . . . , ˆaT that minimizes the cumulative loss
+subject to a hard constraint on the complexity term, the learner must compete with the comparator
+sequence that best trades off the cumulative loss and the smoothness. The Lagrange multiplier, λT ,
+controls the trade-off. Notice that it is natural to allow λT to grow with T , since that penalizes the
+comparator’s change per round more than the loss per round.
+For the particular problem (1) we obtain an efﬁcient algorithm using amortized O(d) time per round,
+where d is the dimension of the data; there is no nasty dependence on T as often happens with min-
+imax algorithms. Our general minimax analysis extends to more advanced complexity terms. For
+example, we may regularize instead by higher-order smoothness (magnitude of increments of incre-
+ments, etc.), or more generally, we may consider a ﬁxed linear process and regularize the comparator
+by the energy of its implied driving noise terms (innovations). We also deal with arbitrary sequences
+of rank-one quadratic constraints on the data.
+We show that the minimax algorithm is of a familiar nature; it is a linear ﬁlter, with a twist. Its
+coefﬁcients are not time-invariant but instead arise from the intricate interplay between the regular-
+ization and the range of the data, combined with shrinkage. Fortunately, they may be computed in
+a pre-processing step by a simple recurrence. An unexpected detail of the analysis is the follow-
+ing. As we will show, the regret objective in (1) is a convex quadratic function of all data, and the
+sub-problem objectives that arise from the backward induction steps in the minimax analysis remain
+quadratic functions of the past. However, they may be either concave or convex. Changing direction
+of curvature is typically a source of technical difﬁculty: the minimax solution is different in either
+case. Quite remarkably, we show that one can determine a priori which rounds are convex and which
+are concave and apply the appropriate solution method in each.
+We also consider what happens when the assumptions we need to make for the minimax analysis to
+go through are violated. We will show that the obtained minimax algorithm is in fact highly robust.
+Simply applying it unlicensed anyway results in adaptive regret bounds that scale naturally with the
+realized data magnitude (or, more generally, its energy).
+
+1.1 Related Work
+
+There is a rich history of tracking problems in the expert setting. In this setting, the learner has some
+ﬁnite number of actions to play and must select a distribution over actions to play each round in
+such a way as to guarantee that the loss is almost as small as the best single action in hindsight. The
+problem of tracking the best expert forces the learner to compare with sequences of experts (usually
+with some ﬁxed number of switches). The ﬁxed-share algorithm [2] was an early solution, but there
+has been more recent work [3, 4, 5, 6]. Tracking experts has been applied to other areas; see e.g. [7]
+for an application to sequential allocation. An extension to linear combinations of experts where the
+expert class is penalized by the p-norm of the sequence was considered in [1].
+Minimax algorithms for squared Euclidean loss have been studied in several contexts such as Gaus-
+sian density estimation [8] and linear regression [9]. In [10], the authors showed that the minimax
+algorithm for quadratic loss is Follow the Leader (i.e. predicting the previous data mean) when the
+player is constrained to play in a ball around the previous data mean. Additionally, Moroshko and
+Krammer [11, 12] propose a weak notion of non-stationarity that allows them to apply the last-step
+minimax approach to a regression-like framework.
+(cid:80)
+The tracking problem in the regret setting has been considered previously, e.g. [1], where the authors
+studied the best linear predictor with a comparison class of all sequences with bounded smoothness
+t(cid:107)at − at−1(cid:107)2 and proposed a general method for converting regret bounds in the static setting
+to ones in the shifting setting (where the best expert is allowed to change).
+
+Outline We start by presenting the formal setup in Section 2 and derive the optimal ofﬂine predic-
+tions. In Section 3 we zoom in to single-shot quadratic games, and solve these both in the convex
+and concave case. With this in hand, we derive the minimax solution to the time series prediction
+problem by backward induction in Section 4. In Section 5 we focus on the motivating problem
+
+2
+
+(1) for which we give a faster implementation and tightly sandwich the minimax regret. Section 6
+concludes with discussion, conjectures and open problems.
+
+2 Protocol and Ofﬂine Problem
+
+The game protocol
+is described in Figure 1 and is the usual online prediction game with
+squared Euclidean loss. The goal of the learner is to incur small regret, that is, to predict
+the data almost as well as the best complexity-penalized sequence ˆa1 ··· ˆaT chosen in hind-
+sight. Our motivating problem (1) gauged complexity by the sum of squared norms of the
+increments,
+thus encouraging smoothness. Here we generalize to complexity terms deﬁned
+(cid:124)
+s ˆat.
+s,t Ks,t ˆa
+We recover the smoothness penalty of (1) by taking K to be the T × T tridiagonal matrix
+
+by a complexity matrix K (cid:23) 0, and charge the comparator ˆa1 ··· ˆaT by (cid:80)
+ ,
+
+• Learner predicts at ∈ Rd
+• Environment reveals xt ∈ Rd
+• Learner suffers loss (cid:107)at − xt(cid:107)2.
+
+2 −1
+...
+−1
+
+For t = 1, 2, . . . , T :
+
+2 −1
+−1
+
+
+
+(2)
+
+2 −1
+−1
+2
+
+Figure 1: Protocol
+
+but we may also regularize by e.g. the sum of
+squared norms (K = I), the sum of norms of higher
+order increments, or more generally, we may consider a ﬁxed linear process and take K1/2 to be the
+matrix that recovers the driving noise terms from the signal, and then our penalty is exactly the en-
+ergy of the implied noise for that linear process. We now turn to computing the identity and quality
+of the best competitor sequence in hindsight.
+Theorem 1. For any complexity matrix K (cid:23) 0, regularization scalar λT ≥ 0, and d × T data
+matrix XT = [x1 ··· xT ] the problem
+
+L∗ := min
+ˆa1,...,ˆaT
+
+(cid:107)ˆat − xt(cid:107)2 + λT
+
+(cid:124)
+Ks,t ˆa
+s ˆat
+
+has linear minimizer and quadratic value given by
+
+[ˆa1 ··· ˆaT ] = XT (I + λT K)−1
+
+and
+
+s,t
+
+L∗ = tr(cid:0)XT (I − (I + λT K)−1)X
+
+(cid:1) .
+
+(cid:124)
+T
+
+(cid:88)
+
+T(cid:88)
+
+t=1
+
+(cid:16)
+
+Proof. Writing ˆA = [ˆa1 ··· ˆaT ] we can compactly express the ofﬂine problem as
+
+L∗ = min
+ˆA
+
+tr
+
+(cid:124)
+( ˆA − XT )
+
+( ˆA − XT ) + λT K ˆA
+
+(cid:124) ˆA
+
+.
+
+The ˆA derivative of the objective is 2( ˆA − XT ) + 2λT ˆAK.
+Setting this to zero yields
+the minimizer ˆA = XT (I + λT K)−1. Back-substitution and simpliﬁcation result in value
+
+tr(cid:0)XT (I − (I + λT K)−1)X
+
+(cid:1).
+
+(cid:124)
+T
+
+(cid:17)
+
+Note that for the choice of K in (2) computing the optimal ˆA can be performed in O(dT ) time by
+solving the linear system A(I + λT KT ) = XT directly. This system decomposes into d (one per
+dimension) independent tridiagonal systems, each in T (one per time step) variables, which can each
+be solved in linear time using Gaussian elimination.
+This theorem shows that the objective of our minimax problem is a quadratic function of the data.
+In order to solve a T round minimax problem with quadratic regret objective, we ﬁrst solve simple
+single round quadratic games.
+
+3 Minimax Single-shot Squared Loss Games
+
+One crucial tool in the minimax analysis of our tracking problem will be solving particular single-
+shot min-max games. In such games, the player and adversary play prediction a and data x resulting
+in payoff given by the following square loss plus a quadratic in x:
+
+V (a, x) := (cid:107)a − x(cid:107)2 + (α − 1)(cid:107)x(cid:107)2 + 2b
+
+(cid:124)
+
+x.
+
+(3)
+
+3
+
+The quadratic and linear terms in x have coefﬁcients α ∈ R and b ∈ Rd. Note
+that V (a, x) is convex in a and either convex or concave in x as decided by
+the sign of α. The following result, proved in Appendix B.1 and illustrated for
+(cid:107)b(cid:107) = 1 by the ﬁgure to the right, gives the minimax analysis for both cases.
+Theorem 2. Let V (a, x) be as in (3). If (cid:107)b(cid:107) ≤ 1, then the minimax problem
+
+ (cid:107)b(cid:107)2
+
+V ∗ := min
+a∈Rd
+if α ≤ 0,
+1 − α
+(cid:107)b(cid:107)2 + α if α ≥ 0,
+
+max
+
+x∈Rd:(cid:107)x(cid:107)≤1
+
+V (a, x)
+
+ b
+
+1 − α
+b
+
+has value V ∗ =
+
+and minimizer a =
+
+if α ≤ 0,
+if α ≥ 0.
+
+(4)
+
+We also want to look at the performance of this strategy when we do not impose the norm bound
+(cid:107)x(cid:107) ≤ 1 nor make the assumption (cid:107)b(cid:107) ≤ 1. By evaluating (3) we obtain an adaptive expression
+that scales with the actual norm (cid:107)x(cid:107)2 of the data.
+Theorem 3. Let a be the strategy from (4). Then, for any data x ∈ Rd and any b ∈ Rd,
+if α ≤ 0, and
+if α ≥ 0.
+
+V (a, x) =
+V (a, x) = (cid:107)b(cid:107)2 + α(cid:107)x(cid:107)2
+
+(cid:13)(cid:13)(cid:13)(cid:13)2 ≤ (cid:107)b(cid:107)2
+
+(cid:13)(cid:13)(cid:13)(cid:13) b
+
+(cid:107)b(cid:107)2
+1 − α
+
+1 − α
+
+1 − α
+
+− x
+
++ α
+
+These two theorems point out that the strategy in (4) is amazingly versatile. The former theorem
+establishes minimax optimality under data constraint (cid:107)x(cid:107) ≤ 1 assuming that (cid:107)b(cid:107) ≤ 1. Yet the latter
+theorem tells us that, even without constraints and assumptions, this strategy is still an extremely
+useful heuristic. For its actual regret is bounded by the minimax regret we would have incurred if
+we would have known the scale of the data (cid:107)x(cid:107) (and (cid:107)b(cid:107)) in advance. The norm bound we imposed
+in the derivation induces the complexity measure for the data to which the strategy adapts. This
+robustness property will extend to the minimax strategy for time series prediction.
+Finally, it remains to note that we present the theorems in the canonical case. Problems with a
+constraint of the form (cid:107)x − c(cid:107) ≤ β may be canonized by re-parameterizing by x(cid:48) = x−c
+and
+a(cid:48) = a−c
+β
+Corollary 4. Fix β ≥ 0 and c ∈ Rd. Let V ∗(α, b) denote the minimax value from (4) with
+parameters α, b. If (cid:107)(α − 1)c + b(cid:107) ≤ β then
+
+and scaling the objective by β−2. We ﬁnd
+
+β
+
+(cid:18)
+
+(cid:19)
+
+(α − 1)c + b
+
+β
+
+(cid:124)
+
+c + (α − 1)(cid:107)c(cid:107)2.
+
++ 2b
+
+min
+
+a
+
+max
+
+x:(cid:107)x−c(cid:107)≤β
+
+V (a, x) = β2V ∗
+
+α,
+
+With this machinery in place, we continue the minimax analysis of time series prediction problems.
+
+4 Minimax Time Series Prediction
+
+In this section, we give the minimax solution to the online prediction problem. Recall that the
+evaluation criterion, the regret, is deﬁned by
+
+R :=
+
+(cid:107)at − xt(cid:107)2 − min
+
+ˆa1,...,ˆaT
+
+(cid:107)ˆat − xt(cid:107)2 + λT tr
+
+K ˆA
+
+(cid:124) ˆA
+
+(5)
+
+where K (cid:23) 0 is a ﬁxed T × T matrix measuring the complexity of the comparator sequence. Since
+all the derivations ahead will be for a ﬁxed T , we drop the T subscript on the λ. We study the
+minimax problem
+
+(6)
+under the constraint on the data that (cid:107)Xtvt(cid:107) ≤ 1 in each round t for some ﬁxed sequence v1, . . . vT
+such that vt ∈ Rt. This constraint generalizes the norm bound constraint from the motivating
+problem (1), which is recovered by taking vt = et. This natural generalization allows us to also
+consider bounded norms of increments, bounded higher order discrete derivative norms etc.
+
+R∗ := min
+
+··· min
+
+max
+xT
+
+max
+x1
+
+R
+
+aT
+
+a1
+
+T(cid:88)
+
+t=1
+
+(cid:16)
+
+(cid:17)
+
+T(cid:88)
+
+t=1
+
+4
+
+0123456-4-2024αV∗xt:(cid:107)Xtvt(cid:107)≤1
+
+We compute the minimax regret and get an expression for the minimax algorithm. We show that,
+at any point in the game, the value is a quadratic function of the past samples and the minimax
+algorithm is linear: it always predicts with a weighted sum of all past samples.
+Most intriguingly, the value function can either be a convex or concave quadratic in the last data
+point, depending on the regularization. We saw in the previous section that these two cases require
+a different minimax solution. It is therefore an extremely fortunate fact that the particular case we
+ﬁnd ourselves in at each round is not a function of the past data, but just a property of the problem
+parameters K and vt.
+We are going to solve the sequential minimax problem (6) one round at a time. To do so, it is
+convenient to deﬁne the value-to-go of the game from any state Xt = [x1 ··· xt] recursively by
+(cid:107)at − xt(cid:107)2 + V (Xt).
+
+V (XT ) := − L∗
+
+max
+
+and
+
+V (Xt−1) := min
+
+at
+
+We are interested in the minimax algorithm and minimax regret R∗ = V (X0). We will show that
+the minimax value and strategy are a quadratic and linear function of the observations. To express the
+value and strategy and state the necessary condition on the problem, we will need a series of scalars
+dt and matrices Rt ∈ Rt×t for t = 1, . . . , T , which, as we will explain below, arises naturally from
+the minimax analysis. The matrices, which depend on the regularization parameter λ, comparator
+complexity matrix K and data constraints vt, are deﬁned recursively back-to-front. The base case
+is RT := (I + λT K)−1. Using the convenient abbreviations vt = wt
+we then recursively deﬁne Rt−1 and set dt by
+Rt−1 := At + (bt − ctut) (bt − ctut)
+Rt−1 := At +
+
+(cid:124) − ctutu
+
+(cid:18)At
+
+(cid:18)ut
+
+if ct ≥ 0,
+
+if ct ≤ 0.
+
+and Rt =
+
+dt := 0
+
+ct
+w2
+t
+
+(cid:19)
+
+(cid:19)
+
+dt :=
+
+(7b)
+
+(cid:124)
+btb
+t
+1 − ct
+
+,
+
+(cid:124)
+t
+
+b
+
+(7a)
+
+bt
+ct
+
+(cid:124)
+t ,
+
+1
+
+(cid:107)Xtvt(cid:107) ≤ 1 for all rounds t ≤ T also satisﬁes(cid:13)(cid:13)Xt−1
+
+Using this recursion for dt and Rt, we can perform the exact minimax analysis under a certain
+condition on the interplay between the data constraint and the regularization. We then show below
+that the obtained algorithm has a condition-free data-dependent regret bound.
+Theorem 5. Assume that K and vt are such that any data sequence XT satisfying the constraint
+t ≤ T . Then the minimax value of and strategy for problem (6) are given by
+V (Xt) = tr (Xt (Rt − I) X
+
+(cid:1)(cid:13)(cid:13) ≤ 1/wt for all rounds
+(cid:40) bt
+
+(cid:0)(ct − 1)ut − bt
+
+T(cid:88)
+
+and
+
+ds
+
+(cid:124)
+t ) +
+
+In particular, this shows that the minimax regret (6) is given by R∗ =(cid:80)T
+
+s=t+1
+
+at = Xt−1
+
+if ct ≤ 0,
+if ct ≥ 0,
+
+1−ct
+bt − ctut
+
+t=1 dt.
+
+Proof. By induction. The base case V (XT ) is Theorem 1. For any t < T we apply the deﬁnition
+of V (Xt−1) and the induction hypothesis to get
+
+T(cid:88)
+
+V (Xt−1) = min
+
+at
+
+max
+
+xt:(cid:107)Xtvt(cid:107)≤1
+
+(cid:107)at − xt(cid:107)2 + tr (Xt(Rt − I)X
+
+(cid:124)
+t ) +
+
+ds
+
+T(cid:88)
+
+s=t+1
+
+s=t+1
+
+dt + C
+
+= tr(Xt−1(At − I)X
+
+(cid:124)
+t−1) +
+
+where we abbreviated
+
+C := min
+at
+
+max
+
+xt:(cid:107)Xtvt(cid:107)≤1
+
+(cid:124)
+(cid:124)
+(cid:107)at − xt(cid:107)2 + (ct − 1)x
+t xt + 2x
+t Xt−1bt.
+
+Without loss of generality, assume wt > 0. Now, as (cid:107)Xtvt(cid:107) ≤ 1 iff (cid:107)Xt−1ut + xt(cid:107) ≤ 1/wt,
+application of Corollary 4 with α = ct, b = Xt−1bt, β = 1/wt and c = −Xt−1ut followed by
+Theorem 2 results in optimal strategy
+
+(cid:40) Xt−1bt
+1−ct
+−ctXt−1ut + Xt−1bt
+
+at =
+
+if ct ≤ 0,
+if ct ≥ 0.
+
+5
+
+and value
+C = (ct−1)(cid:107)Xt−1ut(cid:107)2−2b
+Expanding all squares and rearranging (cycling under the trace) completes the proof.
+
+(cid:124)
+t−1Xt−1ut+
+
+/(1 − ct)
++ ct/w2
+t
+
+(cid:0)(ct − 1)ut − bt
+(cid:0)(ct − 1)ut − bt
+
+(cid:40)(cid:13)(cid:13)Xt−1
+(cid:13)(cid:13)Xt−1
+
+(cid:1)(cid:13)(cid:13)2
+(cid:1)(cid:13)(cid:13)2
+
+(cid:124)
+t X
+
+if ct ≤ 0,
+if ct ≥ 0,
+
+On the one hand, from a technical perspective the condition of Theorem 5 is rather natural.
+It
+guarantees that the prediction of the algorithm will fall within the constraint imposed on the data.
+(If it would not, we could beneﬁt by clipping the prediction. This would be guaranteed to reduce the
+loss, and it would wreck the backwards induction.) Similar clipping conditions arise in the minimax
+analyses for linear regression [9] and square loss prediction with Mahalanobis losses [13].
+In practice we typically do not have a hard bound on the data. Sill, by running the above minimax
+algorithm obtained for data complexity bounds (cid:107)Xtvt(cid:107) ≤ 1, we get an adaptive regret bound that
+scales with the actual data complexity (cid:107)Xtvt(cid:107)2, as can be derived by replacing the application of
+Theorem 2 in the proof of Theorem 5 by an invocation of Theorem 3.
+Theorem 6. Let K (cid:23) 0 and vt be arbitrary. The minimax algorithm obtained in Theorem 5 keeps
+
+the regret (5) bounded by R ≤(cid:80)T
+
+t=1 dt(cid:107)Xtvt(cid:107)2 for any data sequence XT .
+
+4.1 Computation, sparsity
+
+In the important special case (typical application) where the regularization K and data
+constraint vt are encoding some order of smoothness, we ﬁnd that K is banded diagonal
+and vt only has a few tail non-zero entries. It hence is the case that R−1
+T−1 = I + λK
+is sparse. We now argue that the recursive updates (7) preserve sparsity of the inverse R−1
+Appendix C we derive an update for R−1
+to tabulate R−1
+Theorem 7. Say the vt are V -sparse (all but their tail V entries are zero). And say that K is
+D-banded (all but the the main and D − 1 adjacent diagonals to either side are zero). Then each
+is the sum of the D-banded matrix I + λK1:t,1:t and a (D + V − 2)-blocked matrix (i.e. all
+R−1
+but the lower-right block of size D + V − 2 is zero).
+
+. In
+. For computation it hence makes sense
+
+directly. We now argue (proof in Appendix B.2) that all R−1
+
+t−1 in terms of R−1
+
+are sparse.
+
+t
+
+t
+
+t
+
+t
+
+t
+
+So what does this sparsity argument buy us? We only need to maintain the original D-banded matrix
+K and the (D + V − 2)2 entries of the block perturbation. These entries can be updated backwards
+from t = T, . . . , 1 in O((D + V − 2)3) time per round using block matrix inverses. This means that
+the run-time of the entire pre-processing step is linear in T . For updates and prediction we need ct
+and bt, which we can compute using Gaussian elimination from R−1
+in O(t(D + V )) time. In the
+next section we will see a special case in which we can update and predict in constant time.
+
+t
+
+5 Norm-bounded Data with Increment Squared Regularization
+
+We return to our motivating problem (1) with complexity matrix K = KT given by (2) and norm
+constrained data, i.e. vt = et. We show that the Rt matrices are very simple:
+their inverse is
+I + λKt with its lower-right entry perturbed. Using this, we show that the prediction is a linear
+combination of the past observations with weights decaying exponentially backward in time. We
+derive a constant-time update equation for the minimax prediction and tightly sandwich the regret.
+Here, we will calculate a few quantities that will be useful throughout this section. The inverse
+(I + λKT )−1 can be computed in closed form as a direct application of the results in [14]:
+Lemma 8. Recall that sinh(x) = ex−e−x
+
+. For any λ ≥ 0:
+
+2
+
+and cosh(x) = ex+e−x
+
+cosh(cid:0)(T + 1 − |i − j|)ν(cid:1) − cosh(cid:0)(T + 1 − i − j)ν(cid:1)
+
+2λ sinh(ν) sinh(cid:0)(T + 1)ν(cid:1)
+
+2
+
+,
+
+(I + λKT )−1
+
+where ν = cosh−1(cid:0)1 + 1
+
+(cid:1).
+
+i,j =
+
+2λ
+
+6
+
+We need some control on this inverse. We will use the abbreviations
+
+zt := (I + λKt)−1et,
+ht := e
+
+(cid:124)
+t (I + λKt)−1et = e
+
+(cid:124)
+t zt, and
+
+h :=
+
+√
+2
+1 + 2λ +
+
+.
+
+1 + 4λ
+
+(8)
+(9)
+
+(10)
+
+We now show that these quantities are easily computable (see Appendix B for proofs).
+Lemma 9. Let ν be as in Lemma 8. Then, we can write
+1 − (λh)2t
+1 − (λh)2t+2 h,
+
+ht =
+
+and limt→∞ ht = h from below, exponentially fast.
+A direct application of block matrix inversion (Lemma 12) results in
+Lemma 10. We have
+
+ht =
+
+1
+
+1 + 2λ − λ2ht−1
+
+and
+
+zt = ht
+
+(cid:19)
+
+(cid:18)λzt−1
+
+1
+
+.
+
+Intriguingly, following the optimal algorithm for all T rounds can be done in O(T d) computation
+and O(d) memory. These resource requirements are surprising as playing weighted averages typi-
+cally requires O(T 2d). We found that the weighted averages are similar between rounds and can be
+updated cheaply.
+We are now ready to state the main result of this section, proved in Appendix B.3.
+Theorem 11. Let zt and ht be as in (8) and Kt as in (2). For the minimax problem (1) we have
+
+(cid:124)
+t = I + λKt + γtete
+t
+
+R−1
+
+and the minimax prediction in round t is given by
+
+where γt = 1
+ct
+
+− 1
+
+ht
+
+at = λctXt−1zt−1
+
+and ct satisfy the recurrence cT = hT and ct−1 = ht−1 + λ2h2
+
+t−1ct (1 + ct).
+
+5.1
+
+Implementation
+
+Theorem 11 states that the minimax prediction is at = λctXt−1zt−1. Using Lemma 10, we can
+derive an incremental update for at by deﬁning a1 = 0 and
+
+(cid:18)λzt−1
+
+(cid:19)
+
+1
+
+at+1 = λct+1Xtzt = λct+1[Xt−1 xt]ht
+
+= λct+1ht (Xt−1λzt−1 + xt)
+
+(cid:19)
+
+(cid:18) at
+
+ct
+
+= λct+1ht
+
++ xt
+
+.
+
+This means we can predict in constant time O(d) per round.
+
+5.2 Lower Bound
+
+By Theorem 5, using that wt = 1 so that dt = ct, the minimax regret equals(cid:80)T
+t=1 ct. For conve-
+nience, we deﬁne rt := 1 − (λT h)2t (and rT +1 = 1) so that ht = hrt/rt+1. We can obtain a lower
+bound on ct from the expression given in Theorem 11 by ignoring the (positive) c2
+t term to obtain:
+ct−1 ≥ ht−1 + λ2
+t−1ct. By unpacking this lower bound recursively, we arrive at
+
+T h2
+
+T(cid:88)
+
+k=t
+
+ct ≥ h
+
+(λT h)2(k−t)
+
+r2
+t
+
+rkrk+1
+
+.
+
+7
+
+T(cid:88)
+
+ct ≥ h
+
+T(cid:88)
+
+T(cid:88)
+
+Since r2
+
+t /(riri+1) is a decreasing function in i for every t, we have
+
+which leads to
+
+≥ h
+
+r2
+t
+
+rt+1
+
+riri+1
+
+≥ rt
+
+(cid:90) T
+
+(cid:90) T−1
+λT ) and h = Ω(1/λT ), we have that(cid:80)T
+
+(λT h)2(k−t) rt
+rt+1
+
+dkdt = Ω
+
+t+1
+
+0
+
+(cid:18)
+
+−
+
+t=1
+
+k=t
+
+t=1
+where we have exploited the fact that the integrand is monotonic and concave in k and monotonic
+and convex in t to lower bound the sums with an integral. See Claim 14 in the appendix for more
+details. Since − log(λT h) = O(1/
+),
+matching the upper bound below.
+
+t=1 ct = Ω( T√λT
+
+√
+
+(cid:19)
+
+hT
+
+2 log(λT h)
+
+(λT h)2(k−t) rt
+rt+1
+
+5.3 Upper Bound
+As h ≥ ht, the alternative recursion c(cid:48)T +1 = 0 and c(cid:48)t−1 = h + λ2h2c(cid:48)t(1 + c(cid:48)t) satisﬁes c(cid:48)t ≥ ct.
+A simple induction 1 shows that c(cid:48)t is increasing with decreasing t, and it must hence have a limit.
+This limit is a ﬁxed-point of c (cid:55)→ h + λ2h2c(1 + c). This results in a quadratic equation, which has
+two solutions. Our starting point c(cid:48)T +1 = 0 lies below the half-way point 1−λ2h2
+2λ2h2 > 0, so the sought
+limit is the smaller solution:
+
+c =
+
+−λ2h2 + 1 −(cid:112)(λ2h2 − 1)2 − 4λ2h3
+4λ + 1 + 7(cid:1) + 3
+
+2λ2h2
+√
+
+(cid:113)
+
+√
+
+2
+
+This is monotonic in h. Plugging in the deﬁnition of h, we ﬁnd
+
+√
+
+4λ + 1(2λ + 1) + 4λ + 1 − √
+
+.
+
+4λ + 1 + 4(cid:1) +
+
+√
+
+c =
+Series expansion around λ → ∞ results in c ≤ (1 + λ)−1/2. So all in all, the bound is
+
+4λ2
+
+4λ + 1 + 1
+
+.
+
+2λ(cid:0)λ(cid:0)2
+(cid:18)
+
+(cid:19)
+
+,
+
+R∗ = O
+
+T√
+1 + λT
+
+where we have written the explicit T dependence of λ. As discussed in the introduction, allowing
+λT to grow with T is natural and necessary for sub-linear regret. If λT were constant, the regret term
+and complexity term would grow with T at the same rate, effectively forcing the learner to compete
+with sequences that could track the xt sequence arbitrarily well.
+
+6 Discussion
+
+We looked at obtaining the minimax solution to simple tracking/ﬁltering/time series prediction prob-
+lems with square loss, square norm regularization and square norm data constraints. We obtained a
+computational method to get the minimax result. Surprisingly, the problem turns out to be a mixture
+of per-step quadratic minimax problems that can be either concave or convex. These two problems
+have different solutions. Since the type of problem that is faced in each round is not a function
+of the past data, but only of the regularization, the coefﬁcients of the value-to-go function can still
+be computed recursively. However, extending the analysis beyond quadratic loss and constraints is
+difﬁcult; the self-dual property of the 2-norm is central to the calculations.
+Several open problems arise. The stability of the coefﬁcient recursion is so far elusive. For the case
+of norm bounded data, we found that the ct are positive and essentially constant. However, for higher
+order smoothness constraints on the data (norm bounded increments, increments of increments,
+. . . ) the situation is more intricate. We ﬁnd negative ct and oscillating ct, both diminishing and
+increasing. Understanding the behavior of the minimax regret and algorithm as a function of the
+regularization K (so that we can tune λ appropriately) is an intriguing and elusive open problem.
+
+Acknowledgments
+
+We gratefully acknowledge the support of the NSF through grant CCF-1115788, and of the Aus-
+tralian Research Council through an Australian Laureate Fellowship (FL110100281) and through
+the ARC Centre of Excellence for Mathematical and Statistical Frontiers. Thanks also to the Si-
+mons Institute for the Theory of Computing Spring 2015 Information Theory Program.
+
+1For the base case, cT +1 = 0 ≤ cT = h. Then c(cid:48)
+
+t−1 = h+λ2h2c(cid:48)
+
+t(1+c(cid:48)
+
+t) ≥ h+λ2h2c(cid:48)
+
+t+1(1+c(cid:48)
+
+t+1) = c(cid:48)
+t.
+
+8
+
+References
+[1] Mark Herbster and Manfred K Warmuth. Tracking the best linear predictor. The Journal of
+
+Machine Learning Research, 1:281–309, 2001.
+
+[2] Mark Herbster and Manfred K. Warmuth. Tracking the best expert. Machine Learning,
+
+32:151–178, 1998.
+
+[3] Claire Monteleoni. Online learning of non-stationary sequences. Master’s thesis, MIT, May
+
+2003. Artiﬁcial Intelligence Report 2003-11.
+
+[4] Kamalika Chaudhuri, Yoav Freund, and Daniel Hsu. An online learning-based framework for
+tracking. In Proceedings of the Twenty-Sixth Conference on Uncertainty in Artiﬁcial Intelli-
+gence (UAI), pages 101–108, 2010.
+
+[5] Olivier Bousquet and Manfred K Warmuth. Tracking a small set of experts by mixing past
+
+posteriors. The Journal of Machine Learning Research, 3:363–396, 2003.
+
+[6] Nicol`o Cesa-bianchi, Pierre Gaillard, Gabor Lugosi, and Gilles Stoltz. Mirror Descent meets
+Fixed Share (and feels no regret). In F. Pereira, C.J.C. Burges, L. Bottou, and K.Q. Weinberger,
+editors, Advances in Neural Information Processing Systems 25, pages 980–988. Curran As-
+sociates, Inc., 2012.
+
+[7] Avrim Blum and Carl Burch. On-line learning and the metrical task system problem. Machine
+
+Learning, 39(1):35–58, 2000.
+
+[8] Eiji Takimoto and Manfred K. Warmuth. The minimax strategy for Gaussian density estima-
+
+tion. In 13th COLT, pages 100–106, 2000.
+
+[9] Peter L. Bartlett, Wouter M. Koolen, Alan Malek, Manfred K. Warmuth, and Eiji Takimoto.
+Minimax ﬁxed-design linear regression. In P. Gr¨unwald, E. Hazan, and S. Kale, editors, Pro-
+ceedings of The 28th Annual Conference on Learning Theory (COLT), pages 226–239, 2015.
+[10] Jacob Abernethy, Peter L. Bartlett, Alexander Rakhlin, and Ambuj Tewari. Optimal strate-
+gies and minimax lower bounds for online convex games. In Proceedings of the 21st Annual
+Conference on Learning Theory (COLT 2008), pages 415–423, December 2008.
+
+[11] Edward Moroshko and Koby Crammer. Weighted last-step min-max algorithm with improved
+sub-logarithmic regret.
+In N. H. Bshouty, G. Stoltz, N. Vayatis, and T. Zeugmann, editors,
+Algorithmic Learning Theory - 23rd International Conference, ALT 2012, Lyon, France, Oc-
+tober 29-31, 2012. Proceedings, volume 7568 of Lecture Notes in Computer Science, pages
+245–259. Springer, 2012.
+
+[12] Edward Moroshko and Koby Crammer. A last-step regression algorithm for non-stationary
+online learning. In Proceedings of the Sixteenth International Conference on Artiﬁcial Intelli-
+gence and Statistics, AISTATS 2013, Scottsdale, AZ, USA, April 29 - May 1, 2013, volume 31
+of JMLR Proceedings, pages 451–462. JMLR.org, 2013.
+
+[13] Wouter M. Koolen, Alan Malek, and Peter L. Bartlett. Efﬁcient minimax strategies for square
+loss games. In Z. Ghahramani, M. Welling, C. Cortes, N.D. Lawrence, and K.Q. Weinberger,
+editors, Advances in Neural Information Processing Systems (NIPS) 27, pages 3230–3238,
+December 2014.
+
+[14] G. Y. Hu and Robert F. O’Connell. Analytical inversion of symmetric tridiagonal matrices.
+
+Journal of Physics A: Mathematical and General, 29(7):1511, 1996.
+
+9
+
+

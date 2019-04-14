@@ -1,0 +1,1157 @@
+Halting in Random Walk Kernels
+
+Mahito Sugiyama
+
+ISIR, Osaka University, Japan
+
+JST, PRESTO
+
+Karsten M. Borgwardt
+D-BSSE, ETH Z¨urich
+
+Basel, Switzerland
+
+mahito@ar.sanken.osaka-u.ac.jp
+
+karsten.borgwardt@bsse.ethz.ch
+
+Abstract
+
+Random walk kernels measure graph similarity by counting matching walks in
+two graphs. In their most popular form of geometric random walk kernels, longer
+walks of length k are downweighted by a factor of (cid:21)k ((cid:21) < 1) to ensure con-
+vergence of the corresponding geometric series. We know from the ﬁeld of link
+prediction that this downweighting often leads to a phenomenon referred to as
+halting: Longer walks are downweighted so much that the similarity score is
+completely dominated by the comparison of walks of length 1. This is a na¨ıve
+kernel between edges and vertices. We theoretically show that halting may occur
+in geometric random walk kernels. We also empirically quantify its impact in sim-
+ulated datasets and popular graph classiﬁcation benchmark datasets. Our ﬁndings
+promise to be instrumental in future graph kernel development and applications of
+random walk kernels.
+
+1 Introduction
+
+Over the last decade, graph kernels have become a popular approach to graph comparison [4, 5, 7, 9,
+12, 13, 14], which is at the heart of many machine learning applications in bioinformatics, imaging,
+and social-network analysis. The ﬁrst and best-studied instance of this family of kernels are random
+walk kernels, which count matching walks in two graphs [5, 7] to quantify their similarity. In par-
+ticular, the geometric random walk kernel [5] is often used in applications as a baseline comparison
+method on graph benchmark datasets when developing new graph kernels. These geometric random
+walk kernels assign a weight (cid:21)k to walks of length k, where (cid:21) < 1 is set to be small enough to
+ensure convergence of the corresponding geometric series.
+Related similarity measures have also been employed in link prediction [6, 10] as a similarity score
+between vertices [8]. However, there is one caveat regarding these approaches. Walk-based simi-
+larity scores with exponentially decaying weights tend to suffer from a problem referred to as halt-
+ing [1]. They may downweight walks of lengths 2 and more, so much so that the similarity score is
+ultimately completely dominated by walks of length 1. In other words, they are almost identical to
+a simple comparison of edges and vertices, which ignores any topological information in the graph
+beyond single edges. Such a simple similarity measure could be computed more efﬁciently outside
+the random walk framework. Therefore, halting may affect both the expressivity and efﬁciency of
+these similarity scores.
+Halting has been conjectured to occur in random walk kernels [1], but its existence in graph kernels
+has never been theoretically proven or empirically demonstrated. Our goal in this study is to answer
+the open question if and when halting occurs in random walk graph kernels.
+We theoretically show that halting may occur in graph kernels and that its extent depends on prop-
+erties of the graphs being compared (Section 2). We empirically demonstrate in which simulated
+datasets and popular graph classiﬁcation benchmark datasets halting is a concern (Section 3). We
+conclude by summarizing when halting occurs in practice and how it can be avoided (Section 4).
+
+1
+
+We believe that our ﬁndings will be instrumental in future applications of random walk kernels and
+the development of novel graph kernels.
+
+2 Theoretical Analysis of Halting
+
+We theoretically analyze the phenomenon of halting in random walk graph kernels. First, we review
+the deﬁnition of graph kernels in Section 2.1. We then present our key theoretical result regarding
+halting in Section 2.2 and clarify the connection to linear kernels on vertex and edge label histograms
+in Section 2.3.
+
+2.1 Random Walk Kernels
+
+′
+
+; φ
+
+′
+; E
+V(cid:2) = f (v; v
+′
+E(cid:2) = f ((u; u
+
+Let G = (V; E; φ) be a labeled graph, where V is the vertex set, E is the edge set, and φ is a
+mapping φ : V [ E ! (cid:6) with the range (cid:6) of vertex and edge labels. For an edge (u; v) 2 E, we
+identify (u; v) and (v; u) if G is undirected. The degree of a vertex v 2 V is denoted by d(v).
+′
+The direct (tensor) product G(cid:2) = (V(cid:2); E(cid:2); φ(cid:2)) of two graphs G = (V; E; φ) and G
+(V
+
+) is deﬁned as follows [1, 5, 14]:
+
+=
+
+′
+
+) 2 V (cid:2) V
+′
+′
+); (v; v
+
+′
+
+(v
+
+)g;
+
+′ j φ(v) = φ
+′
+)) 2 V(cid:2) (cid:2) V(cid:2) j (u; v) 2 E; (u
+′
+′
+(v
+)) = φ(v) = φ
+
+′
+
+; v
+′
+
+; and φ(u; v) = φ
+
+′
+
+′
+(u
+
+; v
+
+′
+
+)g;
+
+′
+
+′
+
+) 2 E
+) and φ(cid:2)((u; u
+
+′
+
+′
+
+′
+
+′
+
+; v
+
+′
+(u
+
+)) = φ(u; v) =
+). We denote by A(cid:2) the adjacency matrix of G(cid:2) and denote by (cid:14)(cid:2) and ∆(cid:2) the minimum
+
+and all labels are inherited, or φ(cid:2)((v; v
+φ
+and maximum degrees of G(cid:2), respectively.
+′, random walk kernels count all pairs of matching
+To measure the similarity between graphs G and G
+′ [2, 5, 7, 11]. If we assume a uniform distribution for the starting and stopping
+walks on G and G
+′, the number of matching walks is obtained through the
+probabilities over the vertices of G and G
+adjacency matrix A(cid:2) of the product graph G(cid:2) [14]. For each k 2 N, the k-step random walk kernel
+′ is deﬁned as:
+between two graphs G and G
+
+); (v; v
+
+[
+k∑
+
+jV(cid:2)j∑
+
+]
+
+K k(cid:2)(G; G
+
+′
+
+) =
+
+(cid:21)lAl(cid:2)
+
+with a sequence of positive, real-valued weights (cid:21)0; (cid:21)1; (cid:21)2; : : : ; (cid:21)k assuming that A0(cid:2) = I, the
+identity matrix. Its limit K
+
+) is simply called the random walk kernel.
+
+1
+(cid:2) (G; G
+
+′
+
+i;j=1
+
+l=0
+
+ij
+
+1
+(cid:2) can be directly computed if weights are the geometric series, or (cid:21)l = (cid:21)l, resulting
+
+Interestingly, K
+in the geometric random walk kernel:
+
+[ 1∑
+
+jV(cid:2)j∑
+
+]
+
+KGR(G; G
+
+′
+
+) =
+
+(cid:21)lAl(cid:2)
+
+=
+
+jV(cid:2)j∑
+
+[
+(I (cid:0) (cid:21)A(cid:2))
+
+]
+
+(cid:0)1
+
+ij :
+
+i;j=1
+
+l=0
+
+ij
+
+i;j=1
+
+(cid:0)1 =
+
+∑1
+In the above equation, let (I(cid:0) (cid:21)A(cid:2))x = 0 for some value of x. Then, (cid:21)A(cid:2)x = x and ((cid:21)A(cid:2))lx =
+x for any l 2 N. If ((cid:21)A(cid:2))l converges to 0 as l ! 1, (I (cid:0) (cid:21)A(cid:2)) is invertible since x becomes 0.
+Therefore, (I (cid:0) (cid:21)A(cid:2))
+l=0 (cid:21)lAl(cid:2) from the equation (I (cid:0) (cid:21)A(cid:2))(I + (cid:21)A(cid:2) + (cid:21)2A2(cid:2) + : : : ) =
+I [5].
+It is well-known that the geometric series of matrices, often called the Neumann series,
+I + (cid:21)A(cid:2) + ((cid:21)A(cid:2))2 + (cid:1)(cid:1)(cid:1) converges only if the maximum eigenvalue of A(cid:2), denoted by (cid:22)(cid:2);max, is
+strictly smaller than 1=(cid:21). Therefore, the geometric random walk kernel KGR is well-deﬁned only if
+(cid:21) < 1=(cid:22)(cid:2);max.
+There is a relationship for the minimum and maximum degrees (cid:14)(cid:2) and ∆(cid:2) of G(cid:2) [3]: (cid:14)(cid:2) (cid:20)
+d(cid:2) (cid:20) (cid:22)(cid:2);max (cid:20) ∆(cid:2), where d(cid:2) is the average of the vertex degrees of G(cid:2), or d(cid:2) =
+(1=jV(cid:2)j)
+In the inductive learning setting, since we do not know a priori target graphs that a learner will
+receive in the future, (cid:21) should be small enough so (cid:21) < 1=(cid:22)(cid:2);max for any pair of unseen graphs.
+Otherwise, we need to re-compute the full kernel matrix and re-train the learner. In the transductive
+
+v2V(cid:2) d(v). In practice, it is sufﬁcient to set the parameter (cid:21) < 1=∆(cid:2).
+
+∑
+
+2
+
+setting, we are given a collection G of graphs beforehand. We can explicitly compute the upper
+(cid:0)1 with the maximum of the maximum eigenvalues over
+bound of (cid:21), which is (maxG;G′2G (cid:22)(cid:2);max)
+all pairs of graphs G; G
+
+′ 2 G.
+
+2.2 Halting
+
+The geometric random walk kernel KGR is one of the most popular graph kernels, as it can take
+walks of any length into account [5, 14]. However, the fact that it weights walks of length k by the
+(cid:0)1 < 1, immediately tells us that the
+kth power of (cid:21), together with the condition that (cid:21) < ((cid:22)(cid:2);max)
+contribution of longer walks is signiﬁcantly lowered in KGR. If the contribution of walks of length
+2 and more to the kernel value is even completely dominated by the contribution of walks of length
+1, we would speak of halting. It is as if the random walks halt after one step.
+Here, we analyze under which conditions this halting phenomenon may occur in geometric random
+walk kernels. We obtain the following key theoretical statement by comparing KGR to the one-step
+random walk kernel K 1(cid:2).
+′,
+Theorem 1 Let (cid:21)0 = 1 and (cid:21)1 = (cid:21) in the random walk kernel. For a pair of graphs G and G
+
+′
+
+) (cid:20) KGR(G; G
+
+′
+
+) (cid:20) K 1(cid:2)(G; G
+
+′
+
+) + ";
+
+where
+
+K 1(cid:2)(G; G
+
+" = jV(cid:2)j ((cid:21)∆(cid:2))2
+1 (cid:0) (cid:21)∆(cid:2) ;
+
+and " monotonically converges to 0 as (cid:21) ! 0.
+Proof. Let d(v) be the degree of a vertex v in G(cid:2) and N (v) be the set of neighboring vertices of v,
+that is, N (v) = fu 2 V(cid:2) j (u; v) 2 E(cid:2)g. Since A(cid:2) is the adjacency matrix of G(cid:2), the following
+relationships hold:
+
+jV(cid:2)j∑
+
+∑
+
+[A2(cid:2)]ij =
+
+i;j=1
+
+v2V(cid:2)
+) (cid:20) jV(cid:2)j∆3(cid:2) ; : : : ;
+
+′′
+
+d(v
+
+d(v) (cid:20) jV(cid:2)j∆(cid:2);
+∑
+∑
+
+v′2N (v)
+
+v′′2N (v′)
+
+′
+
+) (cid:20) jV(cid:2)j∆2(cid:2);
+
+d(v
+
+[An(cid:2)]ij (cid:20) jV(cid:2)j∆n(cid:2):
+
+jV(cid:2)j∑
+jV(cid:2)j∑
+
+i;j=1
+
+i;j=1
+
+[A(cid:2)]ij =
+
+[A3(cid:2)]ij =
+
+v2V(cid:2)
+
+∑
+∑
+jV(cid:2)j∑
+
+v2V(cid:2)
+
+′
+
+KGR(G; G
+
+) =
+(cid:20) K 1(cid:2)(G; G
+
+i;j=1
+
+v′2N (v)
+
+∑
+jV(cid:2)j∑
+jV(cid:2)j∑
+
+i;j=1
+
+i;j=1
+
+′
+
+) +
+
+From the assumption that (cid:21)∆(cid:2) < 1, we have
+
+[I + (cid:21)A(cid:2) + (cid:21)2A2(cid:2) + : : : ]ij = K 1(cid:2)(G; G
+
+[(cid:21)2A2(cid:2) + (cid:21)3A3(cid:2) + : : : ]ij
+
+′
+
+) + jV(cid:2)j(cid:21)2∆2(cid:2)(1 + (cid:21)∆(cid:2) + (cid:21)2∆2(cid:2) + : : : ) = K 1(cid:2)(G; G
+
+′
+
+) + ":
+
+It is clear that " monotonically goes to 0 when (cid:21) ! 0.
+Moreover, we can normalize " by dividing KGR(G; G
+′,
+Corollary 1 Let (cid:21)0 = 1 and (cid:21)1 = (cid:21) in the random walk kernel. For a pair of graphs G and G
+
+) by K 1(cid:2)(G; G
+
+).
+
+′
+
+′
+
+′
+1 (cid:20) KGR(G; G
+)
+K 1(cid:2)(G; G′)
+
+(cid:20) 1 + "
+′
+
+;
+
+where
+
+′
+"
+
+=
+
+((cid:21)∆(cid:2))2
+
+(1 (cid:0) (cid:21)∆(cid:2))(1 + (cid:21)d(cid:2))
+
+and d(cid:2) is the average of vertex degrees of G(cid:2).
+
+Proof. Since we have
+
+it follows that "=K 1(cid:2)(G; G
+
+′
+
+K 1(cid:2)(G; G
+
+′
+
+) = jV(cid:2)j + (cid:21)
+′.
+) = "
+
+∑
+
+v2V(cid:2)
+
+d(v) = jV(cid:2)j(1 + (cid:21)d(cid:2));
+
+Theorem 1 can be easily generalized to any k-step random walk kernel K k(cid:2).
+
+3
+
+■
+
+■
+
+Corollary 2 Let "(k) = jV(cid:2)j((cid:21)∆(cid:2))k=(1 (cid:0) (cid:21)∆(cid:2)). For a pair of graphs G and G
+
+′, we have
+
+K k(cid:2)(G; G
+
+′
+
+) (cid:20) KGR(G; G
+
+′
+
+) (cid:20) K k(cid:2)(G; G
+
+′
+
+) + "(k + 1):
+
+Our results imply that, in the geometric random walk kernel KGR, the contribution of walks of
+length longer than 2 diminishes for very small choices of (cid:21). This can easily happen in real-world
+graph data, as (cid:21) is upper-bounded by the inverse of the maximum degree of the product graph.
+
+2.3 Relationships to Linear Kernels on Label Histograms
+
+Next, we clarify the relationship between KGR and basic linear kernels on vertex and edge label
+histograms. We show that halting KGR leads to the convergence of it to such linear kernels.
+′, let us introduce two linear kernels on vertex and edge histograms.
+Given a pair of graphs G and G
+Assume that the range of labels (cid:6) = f1; 2; : : : ; sg without loss of generality. The vertex label
+histogram of a graph G = (V; E; φ) is a vector f = (f1; f2; : : : ; fs), such that fi = jfv 2 V j
+φ(v) = igj for each i 2 (cid:6). Let f and f
+′,
+be the vertex label histograms of graphs G and G
+respectively. The vertex label histogram kernel KVH(G; G
+) is then deﬁned as the linear kernel
+between f and f
+
+:
+
+′
+
+′
+
+′
+
+KVH(G; G
+
+′
+
+) = ⟨f ; f
+
+′⟩ =
+
+s
+i=1 fif
+
+′
+i :
+
+Similarly, the edge label histogram is a vector g = (g1; g2; : : : ; gs), such that gi = jf(u; v) 2 E j
+φ(u; v) = igj for each i 2 (cid:6). The edge label histogram kernel KEH(G; G
+) is deﬁned as the linear
+kernel between g and g
+
+′
+
+′, for respective histograms:
+) = ⟨g; g
+
+KEH(G; G
+
+′
+
+′⟩ =
+
+′
+s
+i:
+i=1 gig
+
+Finally, we introduce the vertex-edge label histogram. Let h = (h111; h211; : : : ; hsss) be a his-
+togram vector, such that hijk = jf(u; v) 2 E j φ(u; v) = i; φ(u) = j; φ(v) = kgj for each
+i; j; k 2 (cid:6). The vertex-edge label histogram kernel KVEH(G; G
+) is deﬁned as the linear kernel
+between h and h
+
+′:
+for the respective histograms of G and G
+
+′
+
+′
+
+KVEH(G; G
+
+′
+
+′
+
+′⟩ =
+
+) = ⟨h; h
+′
+s
+i;j;k=1 hijkh
+ijk:
+′
+) if vertices are not labeled.
+
+) = KEH(G; G
+
+Notice that KVEH(G; G
+From the deﬁnition of the direct product of graphs, we can conﬁrm the following relationships
+between histogram kernels and the random walk kernel.
+Lemma 1 For a pair of graphs G; G
+1
+(cid:21)0
+
+′ and their direct product G(cid:2), we have
+K 0(cid:2)(G; G
+
+) = jV(cid:2)j:
+
+KVH(G; G
+
+) =
+
+′
+
+′
+
+∑
+
+∑
+
+∑
+
+KVEH(G; G
+
+′
+
+) =
+
+1
+(cid:21)1
+
+K 1(cid:2)(G; G
+
+′
+
+) (cid:0) (cid:21)0
+(cid:21)1
+
+K 0(cid:2)(G; G
+
+′
+
+) =
+
+[A(cid:2)]ij:
+
+Proof. The ﬁrst equation KVH(G; G
+
+′
+
+) = jV(cid:2)j can be proven from the following:
+
+′
+
+KVH(G; G
+
+) =
+
+′ 2 V
+
+′ j φ(v) = φ
+′
+
+′
+
+)gj = jf (v; v
+
+′
+
+) 2 V (cid:2) V
+
+′ j φ(v) = φ
+
+′
+
+′
+
+)gj
+
+(v
+
+(v
+
+jV(cid:2)j∑
+
+i;j=1
+
+We can prove the second equation in a similar fashion:
+′ j φ(u; v) = φ
+
+) 2 E
+
+KVEH(G; G
+
+) = 2
+
+; v
+
+′
+
+′
+
+′
+
+); φ(u) = φ
+
+′
+
+′
+(u
+
+′
+); φ(v) = φ
+
+′
+
+)gj
+
+(v
+
+= 2
+
+′
+(u; v); (u
+
+′
+
+; v
+
+)
+
+) 2 E (cid:2) E
+
+′
+
+}(cid:12)(cid:12)(cid:12)(cid:12)
+
+′
+
+′
+
+; v
+
+(u
+′
+′
+); φ(v) = φ
+(u
+
+);
+
+′
+
+)
+
+(v
+
+= 2jE(cid:2)j =
+
+[A(cid:2)]ij =
+
+1
+(cid:21)1
+
+K 1(cid:2)(G; G
+
+K 0(cid:2)(G; G
+
+′
+
+):
+
+■
+
+′
+
+′
+
+; v
+
+′
+(u
+
+(cid:12)(cid:12)(cid:12)(cid:12) φ(u; v) = φ
+
+′
+
+′
+
+φ(u) = φ
+) (cid:0) (cid:21)0
+(cid:21)1
+
+′
+
+4
+
+K 0(cid:2)(G; G
+
+′
+
+):
+
+∑
+
+v2V
+
+jf v
+= jV(cid:2)j =
+∑
+(cid:12)(cid:12)(cid:12)(cid:12){(
+
+(u;v)2E
+
+1
+(cid:21)0
+jf (u
+jV(cid:2)j∑
+
+i;j=1
+
+Finally, let us deﬁne a new kernel
+
+KH(G; G
+
+′
+
+) := KVH(G; G
+
+′
+
+′
+
+)
+
+(1)
+
+) + (cid:21)KVEH(G; G
+′
+
+) = K 1(cid:2)(G; G
+
+′
+
+with a parameter (cid:21). From Lemma 1, since KH(G; G
+in the one-step random walk kernel K 1(cid:2), we have the following relationship from Theorem 1.
+
+) holds if (cid:21)0 = 1 and (cid:21)1 = (cid:21)
+
+Corollary 3 For a pair of graphs G and G
+
+where " is given in Theorem 1.
+
+KH(G; G
+
+′, we have
+) (cid:20) KGR(G; G
+′
+
+′
+
+) (cid:20) KH(G; G
+
+′
+
+) + ";
+
+To summarize, our results show that if the parameter (cid:21) of the geometric random walk kernel KGR is
+small enough, random walks halt, and KGR reduces to KH, which ﬁnally converges to KVH. This
+is based on vertex histograms only and completely ignores the topological structure of the graphs.
+
+3 Experiments
+
+We empirically examine the halting phenomenon of the geometric random walk kernel on popular
+real-world graph benchmark datasets and semi-simulated graph data.
+
+3.1 Experimental Setup
+
+Environment. We used Amazon Linux AMI release 2015.03 and ran all experiments on a single
+core of 2.5 GHz Intel Xeon CPU E5-2670 and 244 GB of memory. All kernels were implemented
+in C++ with Eigen library and compiled with gcc 4.8.2.
+Datasets. We collected ﬁve real-world graph classiﬁcation benchmark datasets:1 ENZYMES, NCI1,
+NCI109, MUTAG, and D&D, which are popular in the graph-classiﬁcation literature [13, 14].
+ENZYMES and D&D are proteins, and NCI1, NCI109, and MUTAG are chemical compounds.
+Statistics of these datasets are summarized in Table 1, in which we also show the maximum of
+maximum degrees of product graphs maxG;G′2G ∆(cid:2) for each dataset G. We consistently used
+(cid:0)1 as the upper bound of (cid:21) in geometric random walk kernels, in which
+(cid:21)max = (maxG;G′2G ∆(cid:2))
+the gap was less than one order as the lower bound of (cid:21). The average degree of the product graph,
+the lower bound of (cid:21), were 18:17, 7:93, 5:60, 6:21, and 13:31 for ENZYMES, NCI1, NCI109,
+MUTAG, and DD, respectively.
+Kernels. We employed the following graph kernels in our experiments: We used linear kernels on
+vertex label histograms KVH, edge label histograms KEH, vertex-edge label histograms KVEH, and
+the combination KH introduced in Equation (1). We also included a Gaussian RBF kernel between
+vertex-edge label histograms, denoted as KVEH;G. From the family of random walk kernels, we
+used the geometric random walk kernel KGR and the k-step random walk kernel K k(cid:2). Only the
+number k of steps were treated as a parameter in K k(cid:2) and (cid:21)k was ﬁxed to 1 for all k. We used
+ﬁx-point iterations [14, Section 4.3] for efﬁcient computation of KGR. Moreover, we employed the
+Weisfeiler-Lehman subtree kernel [13], denoted as KWL, as the state-of-the-art graph kernel, which
+has a parameter h of the number of iterations.
+
+3.2 Results on Real-World Datasets
+
+We ﬁrst compared the geometric random walk kernel KGR to other kernels in graph classiﬁcation.
+The classiﬁcation accuracy of each graph kernel was examined by 10-fold cross validation with
+multiclass C-support vector classiﬁcation (libsvm2 was used), in which the parameter C for C-
+SVC and a parameter (if one exists) of each kernel were chosen by internal 10-fold cross validation
+(CV) on only the training dataset. We repeated the whole experiment 10 times and reported average
+
+1The code and all datasets are available at:
+
+http://www.bsse.ethz.ch/mlcb/research/machine-learning/graph-kernels.html
+
+2http://www.csie.ntu.edu.tw/˜cjlin/libsvm/
+
+5
+
+Table 1: Statistics of graph datasets, j(cid:6)V j and j(cid:6)Ej denote the number of vertex and edge labels.
+j(cid:6)Ej max∆(cid:2)
+Dataset
+65
+ENZYMES
+NCI1
+16
+17
+NCI109
+10
+MUTAG
+D&D
+50
+
+avg.jEj maxjV j maxjEj
+149
+62.14
+32.3
+119
+119
+32.13
+33
+19.79
+715.66
+14267
+
+avg.jV j
+32.63
+29.87
+29.68
+17.93
+284.32
+
+#classes
+6
+2
+2
+2
+2
+
+j(cid:6)V j
+3
+37
+38
+7
+82
+
+Size
+600
+4110
+4127
+188
+1178
+
+126
+111
+111
+28
+5748
+
+1
+3
+3
+11
+1
+
+(a) ENZYMES
+
+(b) NCI1
+
+Figure 1: Classiﬁcation accuracy on real-world datasets (Means (cid:6) SD).
+
+(c) NCI109
+
+(cid:0)7; 2
+
+(cid:0)5; : : : ; 25; 27g for C-SVC, the width (cid:27) 2 f10
+
+classiﬁcation accuracies with their standard errors. The list of parameters optimized by the internal
+CV is as follows: C 2 f2
+(cid:0)2; : : : ; 102g in
+the RBF kernel KVEH;G, the number of steps k 2 f1; : : : ; 10g in K k(cid:2), the number of iterations
+h 2 f1; : : : ; 10g in KWL, and (cid:21) 2 f10
+(cid:0)2; (cid:21)maxg in KH and KGR, where (cid:21)max =
+(maxG;G′2G ∆(cid:2))
+Results are summarized in the left column of Figure 1 for ENZYMES, NCI1, and NCI109. We
+present results on MUTAG and D&D in the Supplementary Notes, as different graph kernels do
+not give signiﬁcantly different results (e.g., [13]). Overall, we could observe two trends. First,
+the Weisfeiler-Lehman subtree kernel KWL was the most accurate, which conﬁrms results in [13],
+
+(cid:0)5; : : : ; 10
+
+(cid:0)1.
+
+6
+
+20304050203040502030405010–(cid:31)10–(cid:30)10–(cid:29)10–(cid:28)KGRKHAccuracyAccuracyAccuracyParameter λNumber of steps kKVHKEHKVEHKVEH,GKGRKWLKxkKHLabel histogramRandom walkComparison of KGR with KHk-step KxkComparison of various graph kernels(i)(ii)(iii)1357965707580850.06256570758085657075808510–(cid:31)10–(cid:30)10–(cid:29)10–(cid:28)KGRKHAccuracyAccuracyAccuracyParameter λNumber of steps kKVHKEHKVEHKVEH,GKGRKWLKxkKHLabel histogramRandom walkComparison of KGR with KHk-step KxkComparison of various graph kernels(i)(ii)(iii)1357965707580850.05886570758085657075808510–(cid:31)10–(cid:30)10–(cid:29)10–(cid:28)KGRKHAccuracyAccuracyAccuracyParameter λNumber of steps kKVHKEHKVEHKVEH,GKGRKWLKxkKHLabel histogramRandom walkComparison of KGR with KHk-step KxkComparison of various graph kernels(i)(ii)(iii)13579Figure 2: Distribution of log10 "
+
+′, where "
+
+′ is deﬁned in Corollary 1, in real-world datasets.
+
+Figure 3: Classiﬁcation accuracy on semi-simulated datasets (Means (cid:6) SD).
+
+Second, the two random walk kernels KGR and K k(cid:2) show greater accuracy than na¨ıve linear kernels
+on edge and vertex histograms, which indicates that halting is not occurring in these datasets. It is
+also noteworthy that employing a Gaussian RBF kernel on vertex-edge histograms leads to a clear
+improvement over linear kernels on all three datasets. On ENZYMES, the Gaussian kernel is even
+on par with the random walks in terms of accuracy.
+To investigate the effect of halting in more detail, we show the accuracy of KGR and KH in the
+(cid:0)5 to its upper bound. We can clearly
+center column of Figure 1 for various choices of (cid:21), from 10
+see that halting occurs for small (cid:21), which greatly affects the performance of KGR. More speciﬁcally,
+(cid:0)3 in our datasets), the accuracies are close to the
+if it is chosen to be very small (smaller than 10
+na¨ıve baseline KH that ignores the topological structure of graphs. However, accuracies are much
+closer to that reached by the Weisfeiler-Lehman kernel if (cid:21) is close to its theoretical maximum. Of
+course, the theoretical maximum of (cid:21) depends on unseen test data in reality. Therefore, we often
+have to set (cid:21) conservatively so that we can apply the trained model to any unseen graph data.
+Moreover, we also investigated the accuracy of the random walk kernel as a function of the number
+of steps k of the random walk kernel K k(cid:2). Results are shown in the right column of Figure 1. In
+all datasets, accuracy improves with each step, up to four to ﬁve steps. The optimal number of
+steps in K k(cid:2) and the maximum (cid:21) give similar accuracy levels. We also conﬁrmed Theorem 1 that
+conservative choices of (cid:21) (10
+In addition, Figure 2 shows histograms of log10 "
+(max ∆(cid:2))
+deviation of KGR from KH in percentages. Although "
+ENZYMES and NCI datasets), we conﬁrmed the existence of relatively large "
+than 1 percent), which might cause the difference between KGR and KH.
+
+′ is given in Corollary 1 for (cid:21) =
+′ can be viewed as the
+′ is small on average (about 0.1 percent in
+′ in the plot (more
+
+(cid:0)1 for all pairs of graphs in the respective datasets. The value "
+
+(cid:0)3 or less) give the same accuracy as a one-step random walk.
+
+′, where "
+
+3.3 Results on Semi-Simulated Datasets
+
+To empirically study halting, we generated semi-simulated graphs from our three benchmark
+datasets (ENZYMES, NCI1, and NCI109) and compared the three kernels KGR, KH, and KVH.
+In each dataset, we artiﬁcially generated denser graphs by randomly adding edges, in which
+the number of new edges per graph was determined from a normal distribution with the mean
+
+7
+
+Percentage−4−3−2−101201020304050Percentage−4−3−2−101201020304050Percentage−4−3−2−101201020304050ENZYMESNCI1NCI109(a)(b)(c)log(cid:30)(cid:29) ε’log(cid:30)(cid:29) ε’log(cid:30)(cid:29) ε’Number of added edges010205010065707580Number of added edges010205010065707580AccuracyAccuracySim-ENZYMESSim-NCI1Sim-NCI109KGRKHKVHKGRKHKVHKGRKHKVH(a)(b)(c)Number of added edges01020501003035404550Accuracy25m 2 f10; 20; 50; 100g and the distribution of edge labels was unchanged. Note that the accuracy of
+the vertex histogram kernel KVH stays always the same, as we only added edges.
+Results are plotted in Figure 3. There are two key observations. First, by adding new false edges
+to the graphs, the accuracy levels drop for both the random walk kernel and the histogram kernel.
+However, even after adding 100 new false edges per graph, they are both still better than a na¨ıve
+classiﬁer that assigns all graphs to the same class (accuracy of 16.6 percent on ENZYMES and
+approximately 50 percent on NCI1 and NCI109). Second, the geometric random walk kernel quickly
+approaches the accuracy level of KH when new edges are added. This is a strong indicator that
+halting occurs. As graphs become denser, the upper bound for (cid:21) gets smaller, and the accuracy of
+the geometric random walk kernel KGR rapidly drops and converges to KH. This result conﬁrms
+Corollary 3, which says that both KGR and KH converge to KVH as (cid:21) goes to 0.
+
+4 Discussion
+
+In this work, we show when and where the phenomenon of halting occurs in random walk kernels.
+Halting refers to the fact that similarity measures based on counting walks (of potentially inﬁnite
+length) often downweight longer walks so much that the similarity score is completely dominated
+by walks of length 1, degenerating the random walk kernel to a simple kernel between edges and
+vertices. While it had been conjectured that this problem may arise in graph kernels [1], we provide
+the ﬁrst theoretical proof and empirical demonstration of the occurrence and extent of halting in
+geometric random walk kernels.
+We show that the difference between geometric random walk kernels and simple edge kernels de-
+pends on the maximum degree of the graphs being compared. With increasing maximum degree,
+the difference converges to zero. We empirically demonstrate on simulated graphs that the compar-
+ison of graphs with high maximum degrees suffers from halting. On real graph data from popular
+graph classiﬁcation benchmark datasets, the maximum degree is so low that halting can be avoided
+if the decaying weight (cid:21) is set close to its theoretical maximum. Still, if (cid:21) is set conservatively to a
+low value to ensure convergence, halting can clearly be observed, even on unseen test graphs with
+unknown maximum degrees.
+There is an interesting connection between halting and tottering [1, Section 2.1.5], a weakness of
+random walk kernels described more than a decade ago [11]. Tottering is the phenomenon that a
+walk of inﬁnite length may go back and forth along the same edge, thereby creating an artiﬁcially
+inﬂated similarity score if two graphs share a common edge. Halting and tottering seem to be oppos-
+ing effects. If halting occurs, the effect of tottering is reduced and vice versa. Halting downweights
+these tottering walks and counteracts the inﬂation of the similarity scores. An interesting point is that
+the strategies proposed to remove tottering from walk kernels did not lead to a clear improvement
+in classiﬁcation accuracy [11], while we observed a strong negative effect of halting on the classi-
+ﬁcation accuracy in our experiments (Section 3). This ﬁnding stresses the importance of studying
+halting.
+Our theoretical and empirical results have important implications for future applications of random
+walk kernels. First, if the geometric random walk kernel is used on a graph dataset with known
+maximum degree, (cid:21) should be close to the theoretical maximum. Second, simple baseline kernels
+based on vertex and edge label histograms should be employed to check empirically if the random
+walk kernel gives better accuracy results than these baselines. Third, particularly in datasets with
+high maximum degree, we advise using a ﬁxed-length-k random walk kernel rather than a geomet-
+ric random walk kernel. Optimizing the length k by cross validation on the training dataset led to
+competitive or superior results compared to the geometric random walk kernel in all of our experi-
+ments. Based on these results and the fact that by deﬁnition the ﬁxed-length kernel does not suffer
+from halting, we recommend using the ﬁxed-length random walk kernel as a comparison method in
+future studies on novel graph kernels.
+Acknowledgments. This work was supported by JSPS KAKENHI Grant Number 26880013 (MS),
+the Alfried Krupp von Bohlen und Halbach-Stiftung (KB), the SNSF Starting Grant ‘Signiﬁcant
+Pattern Mining’ (KB), and the Marie Curie Initial Training Network MLPM2012, Grant No. 316861
+(KB).
+
+8
+
+References
+[1] Borgwardt, K. M. Graph Kernels. PhD thesis, Ludwig-Maximilians-University Munich, 2007.
+[2] Borgwardt, K. M., Ong, C. S., Sch¨onauer, S., Vishwanathan, S. V. N., Smola, A. J., and Kriegel,
+H.-P. Protein function prediction via graph kernels. Bioinformatics, 21(suppl 1):i47–i56, 2005.
+
+[3] Brualdi, R. A. The Mutually Beneﬁcial Relationship of Graphs and Matrices. AMS, 2011.
+[4] Costa, F. and Grave, K. D. Fast neighborhood subgraph pairwise distance kernel. In Proceed-
+
+ings of the 27th International Conference on Machine Learning (ICML), 255–262, 2010.
+
+[5] G¨artner, T., Flach, P., and Wrobel, S. On graph kernels: Hardness results and efﬁcient alterna-
+
+tives. In Learning Theory and Kernel Machines (LNCS 2777), 129–143, 2003.
+
+[6] Girvan, M. and Newman, M. E. J. Community structure in social and biological networks.
+
+Proceedings of the National Academy of Sciences (PNAS), 99(12):7821–7826, 2002.
+
+[7] Kashima, H., Tsuda, K., and Inokuchi, A. Marginalized kernels between labeled graphs. In
+Proceedings of the 20th International Conference on Machine Learning (ICML), 321–328,
+2003.
+
+[8] Katz, L. A new status index derived from sociometric analysis. Psychometrika, 18(1):39–43,
+
+1953.
+
+[9] Kriege, N., Neumann, M., Kersting, K., and Mutzel, P. Explicit versus implicit graph feature
+maps: A computational phase transition for walk kernels. In Proceedings of IEEE International
+Conference on Data Mining (ICDM), 881–886, 2014.
+
+[10] Liben-Nowell, D. and Kleinberg, J. The link-prediction problem for social networks. Journal
+
+of the American Society for Information Science and Technology, 58(7):1019–1031, 2007.
+
+[11] Mah´e, P., Ueda, N., Akutsu, T., Perret, J.-L., and Vert, J.-P. Extensions of marginalized graph
+kernels. In Proceedings of the 21st International Conference on Machine Learning (ICML),
+2004.
+
+[12] Shervashidze, N. and Borgwardt, K. M. Fast subtree kernels on graphs. In Advances in Neural
+
+Information Processing Systems (NIPS) 22, 1660–1668, 2009.
+
+[13] Shervashidze, N., Schweitzer, P., van Leeuwen, E. J., Mehlhorn, K., and Borgwardt, K. M.
+Weisfeiler-Lehman graph kernels. Journal of Machine Learning Research, 12:2359–2561,
+2011.
+
+[14] Vishwanathan, S. V. N., Schraudolph, N. N., Kondor, R., and Borgwardt, K. M. Graph kernels.
+
+Journal of Machine Learning Research, 11:1201–1242, 2010.
+
+9
+
+

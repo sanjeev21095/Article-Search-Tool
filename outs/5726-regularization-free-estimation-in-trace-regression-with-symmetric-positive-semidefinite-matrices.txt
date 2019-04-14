@@ -1,0 +1,1538 @@
+Regularization-Free Estimation in Trace Regression with
+
+Symmetric Positive Semideﬁnite Matrices
+
+Martin Slawski
+Ping Li
+Department of Statistics & Biostatistics
+Department of Computer Science
+Rutgers University
+Piscataway, NJ 08854, USA
+{martin.slawski@rutgers.edu,
+pingli@stat.rutgers.edu}
+
+Matthias Hein
+Department of Computer Science
+Department of Mathematics
+Saarland University
+Saarbr¨ucken, Germany
+hein@cs.uni-saarland.de
+
+Abstract
+
+Trace regression models have received considerable attention in the context of
+matrix completion, quantum state tomography, and compressed sensing. Esti-
+mation of the underlying matrix from regularization-based approaches promoting
+low-rankedness, notably nuclear norm regularization, have enjoyed great popular-
+ity. In this paper, we argue that such regularization may no longer be necessary
+if the underlying matrix is symmetric positive semideﬁnite (spd) and the design
+satisﬁes certain conditions. In this situation, simple least squares estimation sub-
+ject to an spd constraint may perform as well as regularization-based approaches
+with a proper choice of regularization parameter, which entails knowledge of the
+noise level and/or tuning. By contrast, constrained least squares estimation comes
+without any tuning parameter and may hence be preferred due to its simplicity.
+
+1 Introduction
+
+Trace regression models of the form
+
+yi = tr(X ⊤
+
+i Σ∗) + εi,
+
+i = 1, . . . , n,
+
+(1)
+
+where Σ∗ ∈ Rm1×m2 is the parameter of interest to be estimated given measurement matrices Xi ∈
+Rm1×m2 and observations yi contaminated by errors εi, i = 1, . . . , n, have attracted considerable
+interest in high-dimensional statistical inference, machine learning and signal processing over the
+past few years. Research in these areas has focused on a setting with few measurements n ≪ m1·m2
+and Σ∗ being (approximately) of low rank r ≪ min{m1, m2}. Such setting is relevant to problems
+such as matrix completion [6, 23], compressed sensing [5, 17], quantum state tomography [11] and
+phase retrieval [7]. A common thread in these works is the use of the nuclear norm of a matrix
+as a convex surrogate for its rank [18] in regularized estimation amenable to modern optimization
+techniques. This approach can be seen as natural generalization of ℓ1-norm (aka lasso) regularization
+for the linear regression model [24] that arises as a special case of model (1) in which both Σ∗ and
+{Xi}n
+The situation is less clear if Σ∗ is known to satisfy additional constraints that can be incorporated in
+estimation. Speciﬁcally, in the present paper we consider the case in which m1 = m2 = m and Σ∗
+is known to be symmetric positive semideﬁnite (spd), i.e. Σ∗ ∈ Sm
++ denoting the positive
+semideﬁnite cone in the space of symmetric real m × m matrices Sm. The set Sm
++ deserves speciﬁc
+interest as it includes covariance matrices and Gram matrices in kernel-based learning [20]. It is
+rather common for these matrices to be of low rank (at least approximately), given the widespread
+use of principal components analysis and low-rank kernel approximations [28]. In the present paper,
+we focus on the usefulness of the spd constraint for estimation. We argue that if Σ∗ is spd and the
+measurement matrices {Xi}n
+
+i=1 are diagonal. It is inarguable that in general regularization is essential if n < m1 · m2.
+
+i=1 obey certain conditions, constrained least squares estimation
+
++ with Sm
+
+min
+Σ∈Sm
++
+
+1
+2n
+
+nXi=1
+
+1
+
+may perform similarly well in prediction and parameter estimation as approaches employing nuclear
+norm regularization with proper choice of the regularization parameter, including the interesting
+
+(yi − tr(X ⊤
+
+i Σ))2
+
+(2)
+
+regime n < δm, where δm = dim(Sm) = m(m + 1)/2. Note that the objective in (2) only consists
+of a data ﬁtting term and is hence convenient to work with in practice since there is no free parameter.
+Our ﬁndings can be seen as a non-commutative extension of recent results on non-negative least
+squares estimation for linear regression [16, 21].
+
+Related work. Model (1) with Σ∗ ∈ Sm
++ has been studied in several recent papers. A good deal
+of these papers consider the setup of compressed sensing in which the {Xi}n
+i=1 can be chosen by
+the user, with the goal to minimize the number of observations required to (approximately) recover
+Σ∗. For example, in [27], recovery of Σ∗ being low-rank from noiseless observations (εi = 0,
+i = 1, . . . , n) by solving a feasibility problem over Sm
++ is considered, which is equivalent to the
+constrained least squares problem (1) in a noiseless setting.
+
+In [3, 8], recovery from rank-one measurements is considered, i.e., for {xi}n
+
+yi = x⊤
+
+i Σ∗xi + εi = tr(X ⊤
+
+i Σ∗) + εi, with Xi = xix⊤
+
+i=1 ⊂ Rm
+i , i = 1, . . . , n.
+
+(3)
+
+As opposed to [3, 8], where estimation based on nuclear norm regularization is proposed, the present
+work is devoted to regularization-free estimation. While rank-one measurements as in (3) are also in
+the center of interest herein, our framework is not limited to this case. In [3] an application of (3) to
+i=1 of the data points
+i=1 are i.i.d. from a distribution with zero mean and covariance matrix
+
+covariance matrix estimation given only one-dimensional projections {x⊤
+is discussed, where the {zi}n
+Σ∗. In fact, this ﬁts the model under study with observations
+εi = x⊤
+
+yi = (x⊤
+
+i zi}n
+
+i Σ∗xi + εi,
+
+i zi)2 = x⊤
+
+i xi = x⊤
+
+i ziz⊤
+
+i {ziz⊤
+
+i − Σ∗}xi, i = 1, . . . , n.
+
+(4)
+
+Specializing (3) to the case in which Σ∗ = σ∗(σ∗)⊤, one obtains the quadratic model
+
+yi = |x⊤
+
+i σ∗|2 + εi
+
+(5)
+which (with complex-valued σ∗) is relevant to the problem of phase retrieval [14]. The approach
+of [7] treats (5) as an instance of (1) and uses nuclear norm regularization to enforce rank-one
+solutions. In follow-up work [4], the authors show a reﬁned recovery result stating that imposing an
+spd constraint − without regularization − sufﬁces. A similar result has been proven independently
+by [10]. However, the results in [4] and [10] only concern model (5). After posting an extended
+version [22] of the present paper, a generalization of [4, 10] to general low-rank spd matrices has
+been achieved in [13]. Since [4, 10, 13] consider bounded noise, whereas the analysis herein assumes
+Gaussian noise, our results are not direclty comparable to those in [4, 10, 13].
+
+Notation.
+
+j=1 λj(M )uju⊤
+
+Md denotes the space of real d × d matrices with inner product hM, M ′i :=
+tr(M ⊤M ′). The subspace of symmetric matrices Sd has dimension δd := d(d + 1)/2. M ∈ Sd
+has an eigen-decomposition M = U ΛU ⊤ = Pd
+j , where λ1(M ) = λmax(M ) ≥
+λ2(M ) ≥ . . . ≥ λd(M ) = λmin(M ), Λ = diag(λ1(M ), . . . , λd(M )), and U = [u1 . . . ud]. For
+q ∈ [1,∞) and M ∈ Sd, kMkq := (Pd
+j=1 |λj(M )|q)1/q denotes the Schatten-q-norm (q = 1: nu-
+clear norm; q = 2 Frobenius norm kMkF , q = ∞: spectral norm kMk∞ := max1≤j≤d |λj(M )|).
+Let S1(d) = {M ∈ Sd : kMk1 = 1} and S+
++. The symbols (cid:23),(cid:22),≻,≺ refer to
+the semideﬁnite ordering. For a set A and α ∈ R, αA := {αa, a ∈ A}.
+It is convenient to re-write model (1) as y = X (Σ∗) + ε, where y = (yi)n
+X : Mm → Rn is a linear map deﬁned by (X (M ))i = tr(X ⊤
+sampling operator. Its adjoint X ∗ : Rn → Mm is given by the map v 7→Pn
+
+i=1 and
+i M ), i = 1, . . . , n, referred to as
+
+Supplement. The appendix contains all proofs, additional experiments and ﬁgures.
+
+1 (d) = S1(d) ∩ Sd
+
+i=1, ε = (εi)n
+
+i=1 viXi.
+
+2 Analysis
+
+Preliminaries. Throughout this section, we consider a special instance of model (1) in which
+
+yi = tr(XiΣ∗) + εi, where Σ∗ ∈ Sm
+
++ , Xi ∈ Sm, and εi
+
+i.i.d.∼ N (0, σ2), i = 1, . . . , n.
+
+(6)
+
+The assumption that the errors {εi}n
+
+stochastic part of our analysis, which could be extended to sub-Gaussian errors.
+
+i=1 are Gaussian is made for convenience as it simpliﬁes the
+
+Note that w.l.o.g., we may assume that {Xi}n
+we have that tr(M Σ∗) = tr(M symΣ∗), where M sym = (M + M ⊤)/2.
+
+i=1 ⊂ Sm. In fact, since Σ∗ ∈ Sm, for any M ∈ Mm
+
+2
+
+In the sequel, we study the statistical performance of the constrained least squares estimator
+
+1
+
+Σ∈Sm
++
+
+bΣ ∈ argmin
+nkX (Σ∗) − X (bΣ)k2
+bΣols ∈ argmin
+
+Σ∈Sm
+
+1
+2nky − X (Σ)k2
+
+2
+
+(b) kbΣ − Σ∗k1,
+
+1
+2nky − X (Σ)k2
+2,
+
+under model (6). More speciﬁcally, under certain conditions on X , we shall derive bounds on
+
+(a)
+
+2,
+
+and
+
+where (a) will be referred to as “prediction error” below. The most basic method for estimating Σ∗
+is ordinary least squares (ols) estimation
+
+which is computationally simpler than (7). While (7) requires convex programming, (9) boils down
+to solving a linear system of equations in δm = m(m + 1)/2 variables. On the other hand, the
+prediction error of ols scales as OP(dim(range(X ))/n), where dim(range(X )) can be as large as
+min{n, δm}, in which case the prediction error vanishes only if δm/n → 0 as n → ∞. Moreover,
+the estimation error kbΣols − Σ∗k1 is unbounded unless n ≥ δm. Research conducted over the past
+few years has thus focused on methods dealing successfully with the case n < δm as long as the
+target Σ∗ has additional structure, notably low-rankedness. Indeed, if Σ∗ has rank r ≪ m, the
+intrinsic dimension of the problem becomes (roughly) mr ≪ δm. In a large body of work, nuclear
+norm regularization, which serves as a convex surrogate of rank regularization, is considered as a
+computationally convenient alternative for which a series of adaptivity properties to underlying low-
+rankedness has been established, e.g. [5, 15, 17, 18, 19]. Complementing (9) with nuclear norm
+regularization yields the estimator
+
+(7)
+
+(8)
+
+(9)
+
+(10)
+
+(11)
+
+where λ > 0 is a regularization parameter. In case an spd constraint is imposed (10) becomes
+
+1
+2nky − X (Σ)k2
+
+2 + λkΣk1,
+
+1
+2nky − X (Σ)k2
+
+2 + λ tr(Σ).
+
+Σ∈Sm
+
+bΣ1 ∈ argmin
+bΣ1+ ∈ argmin
+
+Σ∈Sm
++
+
+Our analysis aims at elucidating potential advantages of the spd constraint in the constrained least
+squares problem (7) from a statistical point of view. It turns out that depending on properties of
+
+data ﬁtting problem without explicit regularization.
+
+X , the behaviour ofbΣ can range from a performance similar to the least squares estimatorbΣols on
+the one hand to a performance similar to the nuclear norm regularized estimatorbΣ1+ with properly
+chosen/tuned λ on the other hand. The latter case appears to be remarkable: bΣ may enjoy similar
+adaptivity properties as nuclear norm regularized estimators even thoughbΣ is obtained from a pure
+We ﬁrst discuss a negative example of X for which the spd-constrained estimator bΣ does not im-
+prove (substantially) over the unconstrained estimatorbΣols. At the same time, this example provides
+
+clues on conditions to be imposed on X to achieve substantially better performance.
+Random Gaussian design. Consider the Gaussian orthogonal ensemble (GOE)
+
+2.1 Negative result
+
+GOE(m) = {X = (xjk), {xjj}m
+
+j=1
+
+i.i.d.∼ N (0, 1), {xjk = xkj}1≤j<k≤m
+
+i.i.d.∼ N (0, 1/2)}.
+
+Gaussian measurements are common in compressed sensing. It is hence of interest to study mea-
+
+i=1
+
+surements {Xi}n
+
+following statement points to a serious limitation associated with such measurements.
+
+i.i.d.∼ GOE(m) in the context of the constrained least squares problem (7). The
+i.i.d.∼ GOE(m), i = 1, . . . , n. For any ε > 0, if n ≤ (1 − ε)δm/2, with
+
+Proposition 1. Consider Xi
+probability at least 1 − 32 exp(−ε2δm), there exists ∆ ∈ Sm
+Proposition 1 implies that if the number of measurements drops below 1/2 of the ambient dimension
+
++ , ∆ 6= 0 such that X (∆) = 0.
+
+δm, estimating Σ∗ based on (7) becomes ill-posed; the estimation error kbΣ − Σ∗k1 is unbounded,
+
+irrespective of the rank of Σ∗. Geometrically, the consequence of Proposition 1 is that the convex
+cone CX = {z ∈ Rn : z = X (∆), ∆ ∈ Sm
++} contains 0. Unless 0 is contained in the boundary
+of CX (we conjecture that this event has measure zero), this means that CX = Rn, i.e. the spd
+
+constraint becomes vacuous.
+
+3
+
+2.2 Slow Rate Bound on the Prediction Error
+
+1
+
+0), where λ0 =
+
+1
+nkX ∗(ε)k∞,
+
+2 = O(λ0kΣ∗k1 + λ2
+
+nkX (Σ∗) − X (bΣ)k2
+
+condition on the sampling operator X . Speciﬁcally, the prediction error will be bounded as
+
+We present a positive result on the spd-constrained least squares estimator bΣ under an additional
+with λ0 typically being of the order O(pm/n) (up to log factors). The rate in (12) can be a sig-
+niﬁcant improvement of what is achieved by bΣols if kΣ∗k1 = tr(Σ∗) is small. If λ0 = o(kΣ∗k1)
+
+that rate coincides with those of the nuclear norm regularized estimators (10), (11) with regulariza-
+tion parameter λ ≥ λ0, cf. Theorem 1 in [19]. For nuclear norm regularized estimators, the rate
+O(λ0kΣ∗k1) is achieved for any choice of X and is slow in the sense that the squared prediction
+error only decays at the rate n−1/2 instead of n−1.
+Condition on X .
+In order to arrive at a suitable condition to be imposed on X so that (12) can
+be achieved, it makes sense to re-consider the negative example of Proposition 1, which states that
+as long as n is bounded away from δm/2 from above, there is a non-trivial ∆ ∈ Sm
++ such that
+X (∆) = 0. Equivalently, dist(PX , 0) = min∆∈S+
+1 (m)},
+
+PX := {z ∈ Rn : z = X (∆), ∆ ∈ S+
+
+1 (m)kX (∆)k2 = 0, where
+
+1 (m) := {∆ ∈ Sm
+
++ : tr(∆) = 1}.
+
+and S+
+
+(12)
+
+0 may imply CX = Rn so that kX (Σ∗) − X (bΣ)k2
+
+In this situation, it is impossible to derive a non-trivial bound on the prediction error as dist(PX , 0) =
+2. To rule this out, the condition
+dist(PX , 0) > 0 is natural. More strongly, one may ask for the following:
+1
+nkX (∆)k2
+
+There exists a constant τ > 0 such that τ 2
+
+0 (X ) := min
+
+2 = kεk2
+
+2 ≥ τ 2.
+
+(13)
+
+∆∈S+
+
+1 (m)
+
+An analogous condition is sufﬁcient for a slow rate bound in the vector case, cf. [21]. However, the
+condition for the slow rate bound in Theorem 1 below is somewhat stronger than (13).
+
+Condition 1. There exist constants R∗ > 1, τ∗ > 0 s.t. τ 2(X , R∗) ≥ τ 2
+
+∗ , where for R ∈ R
+
+τ 2(X , R) = dist2(RPX ,PX )/n = min
+
+A∈RS+
+B∈S+
+
+1 (m)
+1 (m)
+
+1
+nkX (A) − X (B)k2
+2.
+
+The following condition is sufﬁcient for Condition 1 and in some cases much easier to check.
+
+Proposition 2. Suppose there exists a ∈ Rn, kak2 ≤ 1, and constants 0 < φmin ≤ φmax s.t.
+
+λmin(n−1/2X ∗(a)) ≥ φmin,
+
+and λmax(n−1/2X ∗(a)) ≤ φmax.
+
+∗ = (ζ − 1)2φ2
+
+Then for any ζ > 1, X satisﬁes Condition 1 with R∗ = ζ(φmax/φmin) and τ 2
+The condition of Proposition 2 can be phrased as having a positive deﬁnite matrix in the image of
+the unit ball under X ∗, which, after scaling by 1/√n, has its smallest eigenvalue bounded away
+from zero and a bounded condition number. As a simple example, suppose that X1 = √nI. In-
+voking Proposition 2 with a = (1, 0, . . . , 0)⊤ and ζ = 2, we ﬁnd that Condition 1 is satisﬁed with
+R∗ = 2 and τ 2
+i=1 are (sam-
+ple) covariance matrices, where the underlying random vectors satisfy appropriate tail or moment
+conditions.
+Corollary 1. Let πm be a probability distribution on Rm with second moment matrix Γ :=
+Ez∼πm[zz⊤] satisfying λmin(Γ) > 0. Consider the random matrix ensemble
+
+∗ = 1. A more interesting example is random design where the {Xi}n
+
+max.
+
+(14)
+
+i=1 Xi and 0 < ǫn < λmin(Γ). Under the
+
+M(πm, q) =n 1
+qPq
+k , {zk}q
+nPn
+i.i.d.∼ M(πm, q) and letbΓn := 1
+event {kΓ −bΓnk∞ ≤ ǫn}, X satisﬁes Condition 1 with
+
+Suppose that {Xi}n
+
+k=1 zkz⊤
+
+and τ 2
+
+R∗ =
+
+i=1
+
+2(λmax(Γ) + ǫn)
+λmin(Γ) − ǫn
+
+k=1
+
+i.i.d.∼ πmo .
+
+∗ = (λmax(Γ) + ǫn)2.
+
+4
+
+It is instructive to spell out Corollary 1 with πm as the standard Gaussian distribution on Rm. The
+
+matrixbΓn equals the sample covariance matrix computed from N = n· q samples. It is well-known
+[9] that for m, N large, λmax(bΓn) and λmin(bΓn) concentrate sharply around (1+ηn)2 and (1−ηn)2,
+respectively, where ηn =pm/N . Hence, for any γ > 0, there exists Cγ > 1 so that if N ≥ Cγm,
+it holds that R∗ ≤ 2 + γ. Similar though weaker concentration results for kΓ −bΓnk∞ exist for the
+broader class of distributions πm with ﬁnite fourth moments [26]. Specialized to q = 1, Corollary 1
+yields a statement about X made up from random rank-one measurements Xi = ziz⊤
+i , i = 1, . . . , n,
+
+cf. (3). The preceding discussion indicates that Condition 1 tends to be satisﬁed in this case.
+
+Theorem 1. Suppose that model (6) holds with X satisfying Condition 1 with constants R∗ and τ 2
+∗ .
+
+We then have
+
+1
+
+nkX (Σ∗) − X (bΣ)k2
+
+2 ≤ max(2(1 + R∗)λ0kΣ∗k1, 2λ0kΣ∗k1 + 8(cid:18)λ0
+
+R∗
+
+τ∗(cid:19)2)
+
+where, for any µ ≥ 0, with probability at least 1 − (2m)−µ
+
+λ0 ≤ σq(1 + µ)2 log(2m) V 2
+
+n
+
+n , where V 2
+
+i=1 X 2
+
+n =(cid:13)(cid:13) 1
+nPn
+
+i(cid:13)(cid:13)∞ .
+
+Remark: Under the scalings R∗ = O(1) and τ 2
+∗ = Ω(1), the bound of Theorem 1 is of the
+order O(λ0kΣ∗k1 + λ2
+0) as announced at the beginning of this section. For given X , the quantity
+τ 2(X , R) can be evaluated by solving a least squares problem with spd constraints. Hence it is
+feasible to check in practice whether Condition 1 holds. For later reference, we evaluate the term
+V 2
+n for M(πm, q) with πm as standard Gaussian distribution. As shown in the supplement, with
+high probability, V 2
+
+n = O(m log n) holds as long as m = O(nq).
+
+2.3 Bound on the Estimation Error
+
+In the previous subsection, we did not make any assumptions about Σ∗ apart from Σ∗ ∈ Sm
++ . Hence-
+forth, we suppose that Σ∗ is of low rank 1 ≤ r ≪ m and study the performance of the constrained
+
+least squares estimator (7) for prediction and estimation in such setting.
+
+Preliminaries. Let Σ∗ = U ΛU ⊤ be the eigenvalue decomposition of Σ∗, where
+
+U =(cid:20) Uk
+
+m × r m × (m − r) (cid:21)(cid:20)
+
+U⊥
+
+Λr
+
+0(m−r)×r
+
+0r×(m−r)
+
+0(m−r)×(m−r)(cid:21)
+
+where Λr is diagonal with positive diagonal entries. Consider the linear subspace
+
+T⊥ = {M ∈ Sm : M = U⊥AU ⊤
+
+⊥ , A ∈ Sm−r}.
+
+From U ⊤
+
+⊥ Σ∗U⊥ = 0, it follows that Σ∗ is contained in the orthogonal complement
+
+T = {M ∈ Sm : M = UkB + B⊤U ⊤
+
+k , B ∈ Rr×m},
+
+of dimension mr − r(r − 1)/2 ≪ δm if r ≪ m. The image of T under X is denoted by T .
+Conditions on X . We introduce the key quantities the bound in this subsection depends on.
+Separability constant.
+
+τ 2(T) =
+
+1
+n
+
+dist2 (T ,PX ) ,
+
+=
+
+min
+Θ∈T, Λ∈S+
+
+1 (m)∩T⊥
+
+Restricted eigenvalue.
+
+PX := {z ∈ Rn : z = X (∆), ∆ ∈ T⊥ ∩ S+
+1
+nkX (Θ) − X (Λ)k2
+
+2
+
+1 (m)}
+
+φ2(T) = min
+06=∆∈T
+
+2/n
+
+.
+
+kX (∆)k2
+k∆k2
+
+1
+
+As indicated by the following statement concerning the noiseless case, for bounding kbΣ − Σ∗k, it is
+
+inevitable to have lower bounds on the above two quantities.
+
+5
+
+Proposition 3. Consider the trace regression model (1) with εi = 0, i = 1, . . . , n. Then
+
+argmin
+Σ∈Sm
++
+
+1
+2nkX (Σ∗) − X (Σ)k2
+
+2 = {Σ∗} for all Σ∗ ∈ T ∩ Sm
+
++
+
+if and only if it holds that τ 2(T) > 0 and φ2(T) > 0.
+
+Correlation constant. Moreover, we use of the following the quantity. It is not clear to us if it is
+intrinsically required, or if its appearance in our bound is for merely technical reasons.
+
+µ(T) = max(cid:8) 1
+
+n hX (∆),X (∆′)i : k∆k1 ≤ 1, ∆ ∈ T, ∆′ ∈ S+
+
+1 (m) ∩ T⊥(cid:9) .
+
+We are now in position to provide a bound on kbΣ − Σ∗k1.
+
+Theorem 2. Suppose that model (6) holds with Σ∗ as considered throughout this subsection and let
+λ0 be deﬁned as in Theorem 1. We then have
+
+kbΣ − Σ∗k1 ≤ max(8λ0
+
+µ(T)
+
+τ 2(T)φ2(T)(cid:18) 3
+φ2(T)(cid:19) ,
+
+µ(T)
+
+8λ0
+
+φ2(T)(cid:18)1 +
+
+2
+
++
+
+µ(T)
+
+φ2(T)(cid:19) + 4λ0(cid:18) 1
+τ 2(T)).
+
+8λ0
+
+φ2(T)
+
++
+
+1
+
+τ 2(T)(cid:19) ,
+
+Given Theorem 2 an improved bound on the prediction error scaling with λ2
+
+Remark.
+of λ0 can be derived, cf. (26) in Appendix D.
+The quality of the bound of Theorem 2 depends on how the quantities τ 2(T), φ2(T) and µ(T) scale
+with n, m and r, which is design-dependent. Accordingly, the estimation error in nuclear norm
+can be non-ﬁnite in the worst case and O(λ0r) in the best case, which matches existing bounds for
+nuclear norm regularization (cf. Theorem 2 in [19]).
+
+0 in place
+
+i with zi
+
+• The quantity τ 2(T) is speciﬁc to the geometry of the constrained least squares problem
+(7) and hence of critical importance. For instance, it follows from Proposition 1 that for
+standard Gaussian measurements, τ 2(T) = 0 with high probability once n < δm/2. The
+situation can be much better for random spd measurements (14) as exempliﬁed for mea-
+surements Xi = ziz⊤
+τ 2(T) = Ω(1/r) as long as n = Ω(m · r).
+
+i.i.d.∼ N (0, I) in Appendix H. Speciﬁcally, it turns out that
+• It is not restrictive to assume φ2(T) is positive. Indeed, without that assumption, even an
+oracle estimator based on knowledge of the subspace T would fail. Reasonable sampling
+operators X have rank min{n, δm} so that the nullspace of X only has a trivial intersection
+with the subspace T as long as n ≥ dim(T) = mr − r(r − 1)/2.
+• For ﬁxed T, computing µ(T) entails solving a biconvex (albeit non-convex) optimization
+problem in ∆ ∈ T and ∆′ ∈ S+
+1 (m)∩T⊥. Block coordinate descent is a practical approach
+to such optimization problems for which a globally optimal solution is out of reach. In
+this manner we explore the scaling of µ(T) numerically as done for τ 2(T). We ﬁnd that
+µ(T) = O(δm/n) so that µ(T) = O(1) apart from the regime n/δm → 0, without ruling
+out the possibility of undersampling, i.e. n < δm.
+
+3 Numerical Results
+
+relative to regularization-based methods is explored. We also present an application to spiked co-
+variance estimation for the CBCL face image data set and stock prices from NASDAQ.
+
+In this section, we empirically study properties of the estimator bΣ. In particular, its performance
+Comparison with regularization-based approaches. We here empirically evaluate kbΣ − Σ∗k1
+relative to well-known regularization-based methods.
+i.i.d.∼ N (0, I), i =
+Setup. We consider rank-one Wishart measurement matrices Xi = ziz⊤
+1, . . . , n, ﬁx m = 50 and let n ∈ {0.24, 0.26, . . . , 0.36, 0.4, . . . , 0.56} · m2 and r ∈ {1, 2, . . . , 10}
+vary. Each conﬁguration of (n, r) is run with 50 replications. In each of these, we generate data
+
+i , zi
+
+i = 1, . . . , n,
+where Σ∗ is generated randomly as rank r Wishart matrices and the {εi}n
+
+yi = tr(XiΣ∗) + σεi, σ = 0.1,
+
+i=1 are i.i.d. N (0, 1).
+
+(15)
+
+6
+
+   r: 1   
+
+ 
+
+constrained LS
+regularized LS #
+regularized LS
+Chen et al. #
+Chen et al.
+oracle
+
+0.09
+
+0.08
+
+0.07
+
+0.06
+
+0.05
+
+0.04
+
+1
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+a
+m
+g
+S
+
+ 
+
+i
+
+|
+
+ 
+
+ 
+
+   r: 2   
+
+constrained LS
+regularized LS #
+regularized LS
+Chen et al. #
+Chen et al.
+oracle
+
+0.16
+
+0.14
+
+0.12
+
+0.1
+
+0.08
+
+   r: 4   
+
+constrained LS
+regularized LS #
+regularized LS
+Chen et al. #
+Chen et al.
+oracle
+
+0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+1
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+a
+m
+g
+S
+
+ 
+
+i
+
+|
+
+1
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+a
+m
+g
+S
+
+ 
+
+i
+
+|
+
+0.03
+
+ 
+
+600
+
+700
+
+800
+
+900 1000 1100 1200 1300 1400
+
+n
+
+0.06
+
+ 
+
+600
+
+700
+
+800
+
+900 1000 1100 1200 1300 1400
+
+n
+
+ 
+
+600
+
+700
+
+800
+
+900 1000 1100 1200 1300 1400
+
+n
+
+   r: 6   
+
+constrained LS
+regularized LS #
+regularized LS
+Chen et al. #
+Chen et al.
+oracle
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+0.2
+
+ 
+
+ 
+
+1
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+a
+m
+g
+S
+
+ 
+
+i
+
+|
+
+   r: 8   
+
+constrained LS
+regularized LS #
+regularized LS
+Chen et al. #
+Chen et al.
+oracle
+
+1.2
+
+1.1
+
+1
+
+0.9
+
+0.8
+
+0.7
+
+0.6
+
+0.5
+
+0.4
+
+0.3
+
+   r: 10   
+
+ 
+
+constrained LS
+regularized LS #
+regularized LS
+Chen et al. #
+Chen et al.
+oracle
+
+2
+
+1.8
+
+1.6
+
+1.4
+
+1.2
+
+1
+
+0.8
+
+0.6
+
+0.4
+
+1
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+a
+m
+g
+S
+
+ 
+
+i
+
+|
+
+1
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+a
+m
+g
+S
+
+ 
+
+i
+
+|
+
+ 
+
+600
+
+700
+
+800
+
+900 1000 1100 1200 1300 1400
+
+n
+
+ 
+
+700
+
+800
+
+900
+
+1000 1100 1200 1300 1400
+
+n
+
+ 
+
+800
+
+900
+
+1000
+
+1100
+
+n
+
+1200
+
+1300
+
+1400
+
+Figure 1: Average estimation error (over 50 replications) in nuclear norm for ﬁxed m = 50 and
+certain choices of n and r. In the legend, “LS” is used as a shortcut for “least squares”. Chen et
+al. refers to (16). “#”indicates an oracular choice of the tuning parameter. “oracle” refers to the ideal
+
+estimator in (11). Regarding the choice of the regularization parameter λ, we consider the grid
+
+error σrpm/n. Best seen in color.
+Regularization-based approaches. We comparebΣ to the corresponding nuclear norm regularized
+λ∗ · {0.01, 0.05, 0.1, 0.3, 0.5, 1, 2, 4, 8, 16}, where λ∗ = σpm/n as recommended in [17] and pick
+
+λ so that the prediction error on a separate validation data set of size n generated from (15) is
+minimized. Note that in general, neither σ is known nor an extra validation data set is available. Our
+goal here is to ensure that the regularization parameter is properly tuned. In addition, we consider
+an oracular choice of λ where λ is picked from the above grid such that the performance measure
+of interest (the distance to the target in the nuclear norm) is minimized. We also compare to the
+constrained nuclear norm minimization approach of [8]:
+
+min
+
+tr(Σ)
+
+Σ
+
+subject to Σ (cid:23) 0, and ky − X (Σ)k1 ≤ λ.
+
+(16)
+
+For λ, we consider the grid nσp2/π · {0.2, 0.3, . . . , 1, 1.25}. This speciﬁc choice is motivated by
+the fact that E[ky − X (Σ∗)k1] = E[kεk1] = nσp2/π. Apart from that, tuning of λ is performed
+
+as for the nuclear norm regularized estimator. In addition, we have assessed the performance of the
+approach in [3], which does not impose an spd constraint but adds another constraint to (16). That
+additional constraint signiﬁcantly complicates optimization and yields a second tuning parameter.
+Thus, instead of doing a 2D-grid search, we use ﬁxed values given in [3] for known σ. The results
+are similar or worse than those of (16) (note in particular that positive semideﬁniteness is not taken
+advantage of in [3]) and are hence not reported.
+
+Discussion of the results. We conclude from Figure 1 that in most cases, the performance of
+the constrained least squares estimator does not differ much from that of the regularization-based
+methods with careful tuning. For larger values of r, the constrained least squares estimator seems to
+require slightly more measurements to achieve competitive performance.
+
+Real Data Examples. We now present an application to recovery of spiked covariance matrices
+
+This model appears frequently in connection with principal components analysis (PCA).
+
+j=1 λj uju⊤
+
+j + σ2I, where r ≪ m and λj ≫ σ2 > 0, j = 1, . . . , r.
+
+which are of the form Σ∗ =Pr
+
+So far, we have assumed that Σ∗ is of low rank, but it is straight-
+Extension to the spiked case.
+forward to extend the proposed approach to the case in which Σ∗ is spiked as long as σ2 is known or
+
+an estimate is available. A constrained least squares estimator of Σ∗ takes the formbΣ + σ2I, where
+
+1
+2nky − X (Σ + σ2I)k2
+2.
+
+(17)
+
+The case of σ2 unknown or general (unknown) diagonal perturbation is left for future research.
+
+bΣ ∈ argmin
+
+Σ∈Sm
++
+
+7
+
+)
+
+F
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+a
+m
+g
+S
+
+ 
+
+i
+
+|
+(
+0
+1
+g
+o
+
+l
+
+0.6
+
+0.4
+
+0.2
+
+0
+
+−0.2
+
+−0.4
+
+−0.6
+
+−0.8
+
+−1
+
+−1.2
+
+−1.4
+
+β = 1/N (1 sample)
+
+β = 0.008
+
+β = 0.08
+
+β = 0.4
+
+CBCL
+
+β = 1 (all samples)
+
+oracle
+
+F
+
+)
+
+i
+
+ 
+
+|
+*
+a
+m
+g
+S
+−
+ 
+a
+m
+g
+S
+
+i
+
+|
+(
+0
+1
+g
+o
+
+l
+
+2
+
+1.5
+
+1
+
+0.5
+
+0
+
+−0.5
+
+β = 1/N (1 sample)
+
+β = 0.008
+
+β = 0.08
+
+β = 0.4
+
+NASDAQ
+
+oracle
+
+β = 1 (all samples)
+
+0
+
+2
+
+4
+
+6
+
+n / (m * r)
+
+8
+
+10
+
+12
+
+0
+
+1
+
+2
+
+3
+
+n / (m * r)
+
+4
+
+5
+
+6
+
+Figure 2: Average reconstruction errors log10kbΣ − Σ∗kF in dependence of n/(mr) and the param-
+
+eter β. “oracle” refers to the best rank r-approximation Σr.
+
+(i) The CBCL facial image data set [1] consist of N = 2429 images of 19 × 19 pixels
+Data sets.
+(i.e., m = 361). We take Σ∗ as the sample covariance matrix of this data set. It turns out that
+Σ∗ can be well approximated by Σr, r = 50, where Σr is the best rank r approximation to Σ∗
+obtained from computing its eigendecomposition and setting to zero all but the top r eigenvalues.
+(ii) We construct a second data set from the daily end prices of m = 252 stocks from the technology
+sector in NASDAQ, starting from the beginning of the year 2000 to the end of the year 2014 (in
+total N = 3773 days, retrieved from finance.yahoo.com). We take Σ∗ as the resulting sample
+correlation matrix and choose r = 100.
+
+As in preceding measurements, we consider n random Wishart mea-
+Experimental setup.
+surements for the operator X , where n = C(mr), where C ranges from 0.25 to 12. Since
+kΣr − Σ∗kF /kΣ∗kF ≈ 10−3 for both data sets, we work with σ2 = 0 in (17) for simplicity.
+To make recovery of Σ∗ more difﬁcult, we make the problem noisy by using observations
+
+yi = tr(XiSi),
+
+i = 1, . . . , n,
+
+(18)
+
+where Si is an approximation to Σ∗ obtained from the sample covariance respectively sample cor-
+relation matrix of βN data points randomly sampled with replacement from the entire data set,
+i = 1, . . . , n, where β ranges from 0.4 to 1/N (Si is computed from a single data point). For each
+choice of n and β, the reported results are averages over 20 replications.
+
+Results. For the CBCL data set, as shown in Figure 2, bΣ accurately approximates Σ∗ once the
+
+number of measurements crosses 2mr. Performance degrades once additional noise is introduced to
+the problem by using measurements (18). Even under signiﬁcant perturbations (β = 0.08), reason-
+able reconstruction of Σ∗ remains possible, albeit the number of required measurements increases
+accordingly. In the extreme case β = 1/N , the error is still decreasing with n, but millions of
+samples seems to be required to achieve reasonable reconstruction error.
+
+The general picture is similar for the NASDAQ data set, but the difference between using measure-
+ments based on the full sample correlation matrix on the one hand and approximations based on
+random subsampling (18) on the other hand are more pronounced.
+
+4 Conclusion
+
+We have investigated trace regression in the situation that the underlying matrix is symmetric posi-
+tive semideﬁnite. Under restrictions on the design, constrained least squares enjoys similar statistical
+properties as methods employing nuclear norm regularization. This may come as a surprise, as reg-
+ularization is widely regarded as necessary in small sample settings.
+
+Acknowledgments
+
+The work of Martin Slawski and Ping Li is partially supported by NSF-DMS-1444124, NSF-III-
+1360971, ONR-N00014-13-1-0764, and AFOSR-FA9550-13-1-0137.
+
+8
+
+References
+
+[1] CBCL face dataset. http://cbcl.mit.edu/software-datasets/FaceData2.html.
+
+[2] D. Amelunxen, M. Lotz, M. McCoy, and J. Tropp. Living on the edge: phase transitions in convex
+
+programs with random data. Information and Inference, 3:224–294, 2014.
+
+[3] T. Cai and A. Zhang. ROP: Matrix recovery via rank-one projections. The Annals of Statistics, 43:102–
+
+138, 2015.
+
+[4] E. Candes and X. Li. Solving quadratic equations via PhaseLift when there are about as many equations
+
+as unknowns. Foundation of Computational Mathematics, 14:1017–1026, 2014.
+
+[5] E. Candes and Y. Plan. Tight oracle bounds for low-rank matrix recovery from a minimal number of noisy
+
+measurements. IEEE Transactions on Information Theory, 57:2342–2359, 2011.
+
+[6] E. Candes and B. Recht. Exact matrix completion via convex optimization. Foundation of Computational
+
+Mathematics, 9:2053–2080, 2009.
+
+[7] E. Candes, T. Strohmer, and V. Voroninski. PhaseLift: exact and stable signal recovery from magnitude
+measurements via convex programming. Communications on Pure and Applied Mathematics, 66:1241–
+1274, 2012.
+
+[8] Y. Chen, Y. Chi, and A. Goldsmith. Exact and Stable Covariance Estimation from Quadratic Sampling
+
+via Convex Programming. IEEE Transactions on Information Theory, 61:4034–4059, 2015.
+
+[9] K. Davidson and S. Szarek. Handbook of the Geometry of Banach Spaces, volume 1, chapter Local
+
+operator theory, random matrices and Banach spaces, pages 317–366. 2001.
+
+[10] L. Demanet and P. Hand. Stable optimizationless recovery from phaseless measurements. Journal of
+
+Fourier Analysis and its Applications, 20:199–221, 2014.
+
+[11] D. Gross, Y.-K. Liu, S. Flammia, S. Becker, and J. Eisert. Quantum State Tomography via Compressed
+
+Sensing. Physical Review Letters, 105:150401–15404, 2010.
+
+[12] R. Horn and C. Johnson. Matrix Analysis. Cambridge University Press, 1985.
+
+[13] M. Kabanva, R. Kueng, and H. Rauhut und U. Terstiege. Stable low rank matrix recovery via null space
+
+properties. arXiv:1507.07184, 2015.
+
+[14] M. Klibanov, P. Sacks, and A. Tikhonarov. The phase retrieval problem.
+
+Inverse Problems, 11:1–28,
+
+1995.
+
+[15] V. Koltchinskii, K. Lounici, and A. Tsybakov. Nuclear-norm penalization and optimal rates for noisy
+
+low-rank matrix completion. The Annals of Statistics, 39:2302–2329, 2011.
+
+[16] N. Meinshausen. Sign-constrained least squares estimation for high-dimensional regression. The Elec-
+
+tronic Journal of Statistics, 7:1607–1631, 2013.
+
+[17] S. Negahban and M. Wainwright. Estimation of (near) low-rank matrices with noise and high-dimensional
+
+scaling. The Annals of Statistics, 39:1069–1097, 2011.
+
+[18] B. Recht, M. Fazel, and P. Parillo. Guaranteed minimum-rank solutions of linear matrix equations via
+
+nuclear norm minimization. SIAM Review, 52:471–501, 2010.
+
+[19] A. Rohde and A. Tsybakov. Estimation of high-dimensional low-rank matrices. The Annals of Statistics,
+
+39:887–930, 2011.
+
+[20] B. Sch¨olkopf and A. Smola. Learning with kernels. MIT Press, Cambridge, Massachussets, 2002.
+
+[21] M. Slawski and M. Hein. Non-negative least squares for high-dimensional linear models: consistency
+
+and sparse recovery without regularization. The Electronic Journal of Statistics, 7:3004–3056, 2013.
+
+[22] M. Slawski, P. Li, and M. Hein. Regularization-free estimation in trace regression with positive semidef-
+
+inite matrices. arXiv:1504.06305, 2015.
+
+[23] N. Srebro, J. Rennie, and T. Jaakola. Maximum margin matrix factorization.
+
+In Advances in Neural
+
+Information Processing Systems 17, pages 1329–1336, 2005.
+
+[24] R. Tibshirani. Regression shrinkage and variable selection via the lasso. Journal of the Royal Statistical
+
+Society Series B, 58:671–686, 1996.
+
+[25] J. Tropp. User-friendly tools for random matrices: An introduction. 2014. http://users.cms.
+
+caltech.edu/˜jtropp/.
+
+[26] R. Vershynin. How close is the sample covariance matrix to the actual covariance matrix ? Journal of
+
+Theoretical Probability, 153:405–419, 2012.
+
+[27] M. Wang, W. Xu, and A. Tang. A unique ’nonnegative’ solution to an underdetermined system: from
+
+vectors to matrices. IEEE Transactions on Signal Processing, 59:1007–1016, 2011.
+
+[28] C. Williams and M. Seeger. Using the Nystr¨om method to speed up kernel machines. In Advances in
+
+Neural Information Processing Systems 14, pages 682–688, 2001.
+
+9
+
+

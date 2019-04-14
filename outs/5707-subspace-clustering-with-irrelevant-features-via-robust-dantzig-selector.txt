@@ -1,0 +1,825 @@
+Subspace Clustering with Irrelevant Features via
+
+Robust Dantzig Selector
+
+Chao Qu
+
+Department of Mechanical Engineering
+
+National University of Singapore
+
+Huan Xu
+
+Department of Mechanical Engineering
+
+National University of Singapore
+
+A0117143@u.nus.edu
+
+mpexuh@nus.edu.sg
+
+Abstract
+
+This paper considers the subspace clustering problem where the data contains
+irrelevant or corrupted features. We propose a method termed “robust Dantzig se-
+lector” which can successfully identify the clustering structure even with the pres-
+ence of irrelevant features. The idea is simple yet powerful: we replace the inner
+product by its robust counterpart, which is insensitive to the irrelevant features
+given an upper bound of the number of irrelevant features. We establish theoreti-
+cal guarantees for the algorithm to identify the correct subspace, and demonstrate
+the effectiveness of the algorithm via numerical simulations. To the best of our
+knowledge, this is the ﬁrst method developed to tackle subspace clustering with
+irrelevant features.
+
+1
+
+Introduction
+
+The last decade has witnessed fast growing attention in research of high-dimensional data: images,
+videos, DNA microarray data and data from many other applications all have the property that the
+dimensionality can be comparable or even much larger than the number of samples. While this
+setup appears ill-posed in the ﬁrst sight, the inference and recovery is possible by exploiting the fact
+that high-dimensional data often possess low dimensional structures [3, 14, 19]. On the other hand,
+in this era of big data, huge amounts of data are collected everywhere, and such data is generally
+heterogeneous. Clean data and irrelevant or even corrupted information are often mixed together,
+which motivates us to consider the high-dimensional, big but dirty data problem. In particular, we
+study the subspace clustering problem in this setting.
+Subspace clustering is an important subject in analyzing high-dimensional data, inspired by many
+real applications[15]. Given data points lying in the union of multiple linear spaces, subspace clus-
+tering aims to identify all these linear spaces, and cluster the sample points according to the linear
+spaces they belong to. Here, different subspaces may correspond to motion of different objects in
+video sequence [11, 17, 20], different rotations, translations and thickness in handwritten digit or
+the latent communities for the social graph [15, 5].
+A variety of algorithms of subspace clustering have been proposed in the last several years includ-
+ing algebraic algorithms [16], iterative methods [9, 1], statistical methods [11, 10], and spectral
+clustering-based methods [6, 7]. Among them, sparse subspace clustering (SSC) not only achieves
+state-of-art empirical performance, but also possesses elegant theoretical guarantees. In [12], the
+authors provide a geometric analysis of SSC which explains rigorously why SSC is successful even
+when the subspaces are overlapping [12]. [18] and [13] extend SSC to the noisy case, where data are
+contaminated by additive Gaussian noise. Different from these work, we focus on the case where
+some irrelevant features are involved.
+
+1
+
+Mathematically, SSC indeed solves for each sample a sparse linear regression problem with the
+dictionary being all other samples. Many properties of sparse linear regression problem are well
+understood in the clean data case. However, the performance of most standard algorithms deterio-
+rates (e.g. LASSO and OMP) even only a few entries are corrupted. As such, it is well expected
+that standard SSC breaks for subspace clustering with irrelevant or corrupted features (see Section 5
+for numerical evidences). Sparse regression under corruption is a hard problem, and few work has
+addressed this problem [8][21] [4].
+Our contribution: Inspired by [4], we use a simple yet powerful tool called robust inner product
+and propose the robust Dantzig selector to solve the subspace clustering problem with irrelevant
+features. While our work is based upon the robust inner product developed to solve robust sparse
+regression, the analysis is quite different from the regression case since both the data structures and
+the tasks are completely different: for example, the RIP condition – essential for sparse regression –
+is hardly satisﬁed for subspace clustering [18]. We provide sufﬁcient conditions to ensure that
+the Robust Dantzig selector can detect the true subspace clustering. We further demonstrate via
+numerical simulation the effectiveness of the proposed method. To the best of our knowledge, this
+is the ﬁrst attempt to perform subspace clustering with irrelevant features.
+
+2 Problem setup and method
+
+2.1 Notations and model
+The clean data matrix is denoted by XA ∈ RD×N , where each column corresponds to a data point,
+normalized to a unit vector. The data points are lying on a union of L subspace S = ∪L
+l=1Sl.
+Each subspace Sl is of dimension dl which is smaller than D and contains Nl data samples with
+N1+N2+···+NL = N. We denote the observed dirty data matrix by X ∈ R(D+D1)×N . Out of the
+D + D1 features, up to D1 of them are irrelevant. Without loss of generality, let X = [X T
+A ]T ,
+where XO ∈ RD1×N denotes the irrelevant data. The subscript A and O denote the set of row
+indices corresponding to true and irrelevant features and the superscript T denotes the transpose.
+Notice that we do not know O a priori except its cardinality is D1. The model is illustrated in Figure
+A ∈ RD×Nl denote the selection of columns in XA that belongs to Sl. Similarly, denote
+1. Let X (l)
+the corresponding columns in X by X (l). Without loss of generality, let X = [X (1), X (2), ..., X (L)]
+be ordered. Further more, we use the subscript “−i”to describe a matrix that excludes the column
+i, e.g., (XA)(l)−i = [(xA)(l)
+i+1, ..., (xA)(l)
+]. We use the superscript lc to describe
+Nl
+= [X (1)
+, ..., X (L)
+a matrix that excludes column in subspace l, e.g., (XA)lc
+A ].
+For a matrix Σ, we use Σs,η to denote the submatrix with row indices in set s and column indices
+in set η. For any matrix Z, P (Z) denotes the symmetrized convex hull of its column, i.e., P (Z) =
+conv(±z1,±z2, ....,±zN ) . We deﬁne P l−i := P ((XA)(l)−i) for simpliﬁcation, i.e., the symmetrized
+convex hull of clean data in subspace l except data i. Finally we use (cid:107) · (cid:107)2 to denote the l2 norm of
+a vector and (cid:107) · (cid:107)∞ to denote inﬁnity norm of a vector or a matrix. Caligraphic letters such as X ,Xl
+represent the set containing all columns of the corresponding clean data matrix.
+
+A , ..., X (l−1)
+
+, X (l+1)
+
+1 , ..., (xA)(l)
+
+i−1, (xA)(l)
+
+O , X T
+
+A
+
+A
+
+Figure 1: Illustration of the model of irrelevant features in the subspace clustering problem. The
+left one is the model addressed in this paper: Among total D + D1 features, up tp D1 of them are
+irrelevant. The right one illustrates a more general case, where the value of any D1 element of each
+column can be arbitrary (e.g., due to corruptions). It is a harder case and left for future work.
+
+2
+
+Figure 2: Illustration of the Subspace Detection Property. Here, each ﬁgure corresponds to a matrix
+where each column is ci, and non-zero entries are in white. The left ﬁgure satisﬁes this property.
+The right one does not.
+
+2.2 Method
+
+In this secion we present our method as well as the intuition that derives it. When all observed data
+are clean, to solve the subspace clustering problem, the celebrated SSC [6] proposes to solve the
+following convex programming
+
+(cid:107)ci(cid:107)1
+
+min
+ci
+
+s.t. xi = X−ici,
+
+(1)
+
+for each data point xi. When data are corrupted by noise of small magnitude such as Gaussian noise,
+a straightforward extension of SSC is the Lasso type method called “Lasso-SSC” [18, 13]
+
+(cid:107)ci(cid:107)1 +
+
+λ
+2
+
+min
+ci
+
+(cid:107)xi − X−ici(cid:107)2
+2.
+
+(2)
+
+Note that while Formulation (2) has the same form as Lasso, it is used to solve the subspace cluster-
+ing task. In particular, the support recovery analysis of Lasso does not extend to this case, as X−i
+typically does not satisfy the RIP condition [18].
+This paper considers the case where X contains irrelevant/gross corrupted features. As we dis-
+cussed above, Lasso is not robust to such corruption. An intuitive idea is to consider the following
+formulation ﬁrst proposed for sparse linear regression [21].
+
+(cid:107)ci(cid:107)1 +
+
+(cid:107)xi − (X−i − E)ci(cid:107)2
+
+2 + η(cid:107)E(cid:107)∗,
+
+λ
+2
+
+min
+ci,E
+
+and the smallest (D − k) are selected. Let Ω be the set of selected indices, then (cid:104)a, b(cid:105)k =(cid:80)
+
+(3)
+where (cid:107) · (cid:107)∗ is some norm corresponding to the sparse type of E. One major challenge of this
+formulation is that it is not convex. As such, it is not clear how to efﬁciently ﬁnd the optimal
+solution, and how to analyze the property of the solution (typically done via convex analysis) in the
+subspace clustering task.
+Our method is based on the idea of robust inner product. The robust inner product (cid:104)a, b(cid:105)k is deﬁned
+as follows: For vector a ∈ RD, b ∈ RD, we compute qi = aibi, i = 1, ..., N. Then {|qi|} are sorted
+i∈Ω qi,
+i.e., the largest k terms are truncated. Our main idea is to replace all inner products involved by
+robust counterparts (cid:104)a, b(cid:105)D1, where D1 is the upper bound of the number of irrelevant features.
+The intuition is that the irrelevant features with large magnitude may affect the correct subspace
+clustering. This simple truncation process will avoid this. We remark that we do not need to know
+the exact number of irrelevant feature, but instead only an upper bound of it.
+Extending (2) using the robust inner product leads the following formulation:
+
+(cid:107)ci(cid:107)1 +
+
+λ
+2
+
+cT
+i
+
+min
+ci
+
+ˆΣci − λˆγT ci,
+
+(4)
+
+where ˆΣ and ˆγ are robust counterparts of X T−iX−i and X T−ixi. Unfortunately, ˆΣ may not be a
+positive semideﬁnite matrix, thus (4) is not a convex program. Unlike the work [4][8] which studies
+
+3
+
+non-convexity in linear regression, the difﬁculty of non-convexity in the subspace clustering task
+appears to be hard to overcome.
+Instead we turn to the Dantzig Selector, which is essentially a linear program (and hence no positive
+semideﬁniteness is required):
+
+(cid:107)ci(cid:107)1 + λ(cid:107)X T−i(X−ici − xi)(cid:107)∞.
+
+min
+ci
+
+(5)
+
+Replace all inner product by its robust counterpart, we propose the following Robust Dantzig Selec-
+tor, which can be easily recast as a linear program:
+
+Robust Dantzig Selector:
+
+(cid:107)ci(cid:107)1 + λ(cid:107) ˆΣci − ˆγ(cid:107)∞,
+
+min
+ci
+
+(6)
+
+Subspace Detection Property: To measure whether the algorithm is successful, we deﬁne the
+criterion Subspace Detection Property following [18]. We say that the Subspace Detection Prop-
+erty holds, if and only if for all i, the optimal solution to the robust Dantzig Selector satisﬁes (1)
+Non-triviality: ci is not a zero vector; (2) Self-Expressiveness Property: nonzeros entries of ci
+correspond to only columns of X sampled from the same subspace as xi. See Figure 2 for illustra-
+tions.
+
+3 Main Results
+
+To avoid repetition and cluttered notations, we denote the following primal convex problem by
+P (Σ, γ)
+
+Its dual problem, denoted by D(Σ, γ), is
+
+min
+
+c
+
+(cid:107)c(cid:107)1 + λ(cid:107)Σc − γ(cid:107)∞.
+
+(cid:104)ξ, γ(cid:105)
+
+subject to (cid:107)ξ(cid:107)1 = λ (cid:107)Σξ(cid:107)∞ ≤ 1.
+
+max
+
+ξ
+
+(7)
+
+Before we presents our results, we deﬁne some quantities.
+The dual direction is an important geometric term introdcued in analyzing SSC [12]. Here we deﬁne
+similarly the dual direction of the robust Dantzig selector: Notice that the dual of robust Dantzig
+problem is D( ˆΣ, ˆγ), where ˆγ and ˆΣ are robust counterparts of X T−ixi and X T−iX−i respectively
+(recall that X−i and xi are the dirty data). We decompose ˆΣ into two parts ˆΣ = (XA)T−i(XA)−i+ ˜Σ,
+where the ﬁrst term corresponds to the clean data, and the second term is due to the irrelevant features
+and truncation from the robust inner product. Thus, the second constraint of the dual problem
+becomes (cid:107)((XA)T−i(XA)−i + ˜Σ)ξ(cid:107)∞ ≤ 1. Let ξ be the optimal solution to the above optimization
+problem, we deﬁne v(xi, X−i, λ) := (XA)−iξ and the dual direction as vl =
+
+.
+
+v(xl
+(cid:107)v(xl
+
+i,X (l)−i ,λ)
+i,X (l)−i ,λ)(cid:107)2
+
+Similarly as SSC [12], we deﬁne the subspace incoherence. Let V l = [vl
+ence of a point set Xl to other clean data points is deﬁned as µ(Xl) = maxk:k(cid:54)=l (cid:107)(X (k)
+Recall that we decompose ˆΣ and ˆγ as ˆΣ = (XA)T−i(XA)−i + ˜Σ and ˆγ = (XA)T−i(xA)i + ˜γ.
+Intuitively, for robust Dantzig selecter to succeed, we want ˜Σ and ˜γ not too large. Particularly, we
+assume (cid:107)(xA)i(cid:107)∞ ≤ 1 and (cid:107)(XA)−i(cid:107)∞ ≤ 2.
+Theorem 1 (Deterministic Model). Denote µl
+minl=1,...,L rl and suppose µl < rl for all l. If
+
+]. The incoher-
+A )T V l(cid:107)∞.
+
+:= mini:xi∈Xl r(P l−i), r :=
+
+:= µ(Xl), rl
+
+2, ..., vl
+Nl
+
+1, vl
+
+2D12
+then the subspace detection property holds for all λ in the range
+
+r2 − 4D112r − 2D12
+
+< min
+
+2
+
+l
+
+1
+
+1
+
+r2 − 4D112r − 2D12
+
+2
+
+< λ < min
+
+l
+
+4
+
+rl − ul
+2(ul + rl)
+
+,
+
+rl − ul
+2(ul + rl)
+
+2D12
+
+(8)
+
+(9)
+
+.
+
+In an ideal case when D1 = 0, the condition of the upper bound of λ reduces to rl > ul, similar to
+the condition for SSC in the noiseless case [12].
+Based on Condition (8), under a randomized generative model, we can derive how many irrelevant
+features can be tolerated.
+Theorem 2 (Random model). Suppose there are L subspaces and for simplicity, all subspaces have
+same dimension d and are chosen uniformly at random. For each subspace there are ρd + 1 points
+chosen independently and uniformly at random. Up to D1 features of data are irrelevant. Each
+data point (including true and irrelevant features) is independent from other data points. Then for
+some universal constants C1, C2, the subspace detection property holds with probability at least
+1 − 4
+
+N − N exp(−√
+
+ρd) if
+
+d ≤ Dc2(ρ) log(ρ)
+
+12 log N
+
+,
+
+and
+
+1
+
+2 c2(ρ) log ρ
+
+√
+d − (
+(cid:113) 12d log N
+
+2c(ρ)
+
+(cid:113) log ρ
+
+1
+d + 1) C1D1(log D+C2 log N )
+
+D
+
+< λ <
+
+1 − κ
+1 + κ
+
+D
+
+C1D1(log D + C2 log N )
+
+,
+
+c(ρ)D log ρ
+
+N − N exp(−√
+(cid:113) log ρ
+N − N exp(−√
+
+Dc(ρ)
+
+d
+
+Dc2(ρ) log ρ ; c(ρ) is a constant only depending on the density of data points on
+where κ =
+subspace and satisﬁes (1) c(ρ) > 0 for all ρ > 1, (2) there is a numerical value ρ0, such that for all
+ρ > ρ0, one can take c(ρ) = 1/
+Simplifying the above conditions, we can determine the number of irrelevant features that can be
+tolerated. In particular, if d ≥ 2c2(ρ) log ρ and we choose the λ as
+
+√
+
+8.
+
+then the maximal number of irrelevant feature D1 that can be torelated is
+
+λ =
+
+4d
+
+c2(ρ) log ρ
+
+,
+
+D1 = min{
+
+8C1d(log(D) + C2 log N )
+
+1 − κ
+1 + κ
+
+,
+
+C0Dc2(ρ) log ρ
+
+C1d(log(D) + C2 log N )
+
+},
+
+with probability at least 1 − 4
+If d ≤ 2c2(ρ) log ρ, and we choose the same λ, then the number of irrelevant feature we can tolerate
+is
+
+ρd).
+
+D1 = min{
+
+√
+4
+
+with probability at least 1 − 4
+
+ρd).
+
+2C1(log(D) + C2 log N )
+
+1 − κ
+1 + κ
+
+,
+
+C0Dc2(ρ) log ρ
+
+C1d(log(D) + C2 log N )
+
+},
+
+Remark 1. If D is much larger than D1, the lower bound of λ is proportional to the subspace
+dimension d. When d increases, the upper bound of λ decreases, since 1−κ
+1+κ decreases. Thus the
+valid range of λ shrinks when d increases.
+Remark 2.
+1−κ
+min(C1
+1+κ
+
+Ignoring the logarithm terms, when d is large, the tolerable D1 is proportional to
+D
+d , C2
+
+d ). When d is small, D1 is proportional to min(C1
+
+√
+D
+d , C2D/
+
+1−κ
+1+κ
+
+d) .
+
+D
+
+4 Roadmap of the Proof
+
+In this section, we lay out the roadmap of proof. In speciﬁc we want to establish the condition with
+the number of irrelevant features, and the structure of data (i.e., the incoherence µ and inradius r)
+for the algorithm to succeed. Indeed, we provide a lower bound of λ such that the optimal solution
+ci is not trivial; and an upper bound of λ so that the Self-Expressiveness Property holds. Combining
+them together established the theorems.
+
+5
+
+4.1 Self-Expressiveness Property
+
+The Self-Expressiveness Property is related to the upper bound of λ. The proof technique is inspired
+by [18] and [12], we ﬁrst establish the following lemma, which provides a sufﬁcient condition such
+that Self-Expressiveness Property holds of the problem 6.
+Lemma 1. Consider a matrix Σ ∈ RN×N and γ ∈ RN×1, If there exist a pair (˜c, ξ) such that ˜c
+has a support S ⊆ T and
+
+sgn(˜cs) + Σs,ηξη = 0,
+(cid:107)Σsc∩T,ηξη(cid:107)∞ ≤ 1,
+(cid:107)ξ(cid:107)1 = λ,
+(cid:107)ΣT c,ηξη(cid:107)∞ < 1,
+
+(10)
+
+where η is the set of indices of entry i such that |(Σ˜c − γ)i| = (cid:107)Σ˜c − γ(cid:107)∞, then for all optimal
+solution c∗ to the problem P (Σ, γ), we have c∗
+
+T c = 0.
+
+The variable ξ in Lemma 1 is often termed the “dual certiﬁcate”. We next consider an oracle problem
+P ( ˆΣl,l, ˆγl), and use its dual optimal variable denoted by ˆξ, to construct such a dual certiﬁcate. This
+candidate satisﬁes all conditions in the Lemma 1 automatically except to show
+
+(cid:107) ˆΣlc,ˆη
+
+ˆξˆη(cid:107)∞ < 1,
+
+(11)
+where lc denotes the set of indices expect the ones corresponding to subspace l. We can compare
+this condition with the corresponding one in analyzing SSC, in which one need (cid:107)(X)(lc)T v(cid:107)∞ < 1,
+where v is the dual certiﬁcate. Recall that we can decompose ˆΣlc,ˆη = (XA)(lc)T (XA)ˆη + ˜Σlc,ˆη.
+Thus Condition 11 becomes
+
+(cid:107)(XA)(lc)T ((XA)ˆη
+
+ˆξˆη) + ˜Σlc,ˆη
+
+ˆξˆη(cid:107)∞ < 1.
+ˆξˆη(cid:107)2 and (cid:107) ˜Σlc,ˆη
+
+(12)
+
+ˆξˆη(cid:107)∞.
+
+To show this holds, we need to bound two terms (cid:107)(XA)ˆη
+Bounding (cid:107) ˜Σ(cid:107)∞,(cid:107)˜γ(cid:107)∞
+The following lemma relates D1 with (cid:107) ˜Σ(cid:107)∞ and (cid:107)˜γ(cid:107)∞.
+Lemma 2. Suppose ˆΣ and ˆγ are robust counterparts of X T−iX−i and X T−ixi respectively and among
+D + D1 features, up to D1 are irrelevant. We can decompose ˆΣ and ˆγ into following form ˆΣ =
+(XA)T−i(XA)−i + ˜Σ and ˆγ = (XA)T−i(xA)i + ˜γ. We deﬁne δ1 := (cid:107)˜γ(cid:107)∞ and δ2 := (cid:107) ˜Σ(cid:107)∞ .If
+(cid:107)(xA)i(cid:107)∞ ≤ 1 and (cid:107)(XA)−i(cid:107)∞ ≤ 2, then δ2 ≤ 2D12
+√
+We then bound 1 and 2 in the random model using the upper bound of the spherical cap [2].
+Indeed we have 1 ≤ C1(log D + C2 log N )/
+D with high
+probability.
+Bounding (cid:107)Xˆη
+By exploiting the feasible condition in the dual of the oracle problem, we obtain the following
+bound:
+
+√
+D and 2 ≤ C1(log D + C2 log N )/
+
+2, δ1 ≤ 2D112.
+
+ˆξˆη(cid:107)2
+
+(cid:107)Xˆη
+
+ˆξˆη(cid:107)2 ≤ 1 + 2D1λ2
+
+2
+
+.
+
+(cid:113) log ρ
+
+r(P l−i)
+
+√
+
+Furthermore, r(P l−i) can be lower bound by c(ρ)√
+C2 log N )/
+Plugging this upper bound into (12), we obtain the upper bound of λ.
+
+d
+
+2
+
+D in the random model with high probability. Thus the RHS can be upper bounded.
+
+and 2 can be upper bounded by C1(log D+
+
+4.2 Non-triviality with sufﬁciently large λ
+
+To ensure that the solution is not trivial (i.e., not all-zero), we need a lower bound on λ.
+
+6
+
+If λ satisﬁes the following condition, the optimal solution to problem 6 can not be zero
+
+λ >
+
+r2(P l−i) − 2D12
+
+1
+2 − 4r(P l−i)D112
+
+.
+
+(13)
+
+The proof idea is to show when λ is large enough, the trivial solution c = 0 can not be optimal. In
+particular, if c = 0, the corresponding value in the primal problem is λ(cid:107)ˆγl(cid:107)∞. We then establish a
+lower bound of (cid:107)ˆγl(cid:107)∞ and a upper bound of (cid:107)c(cid:107)1 + λ(cid:107) ˆΣl,lc− ˆγl(cid:107)∞ so that the following inequality
+always holds by some carefully choosen c.
+
+(cid:107)c(cid:107)1 + λ(cid:107) ˆΣl,lc − ˆγl(cid:107)∞ < λ(cid:107)ˆγl(cid:107)∞.
+
+(14)
+
+We then further lower bound the RHS of Equation (13) using the bound of 1, 2 and r(P l−i). Notice
+that condition (14) requires that λ > A and condition (11) requires λ < B, where A and B are some
+terms depending on the number of irrelevant features. Thus we require A < B to get the maximal
+number of irrelevant features that can be tolerated.
+
+5 Numerical simulations
+
+In this section, we use three numerical experiments to demonstrate the effectiveness of our method
+to handle irrelevant/corrupted features. In particular, we test the performance of our method and
+effect of number of irrelevant features and dimension subspaces d with respect to different λ. In
+all experiments, the ambient dimension D = 200, sample density ρ = 5, the subspace are drawn
+uniformly at random. Each subspace has ρd+1 points chosen independently and uniformly random.
+We measure the success of the algorithms using the relative violation of the subspace detection
+property deﬁned as follows,
+
+RelV iolation(C,M) =
+
+(cid:80)
+(cid:80)
+(i,j) /∈M |C|i,j
+(i,j)∈M |C|i,j
+
+,
+
+where C = [c1, c2, ..., cN ], M is the ground truth mask containing all (i, j) such that xi, xj belong
+to a same subspace. If RelV iolation(C,M) = 0, then the subspace detection property is satisﬁed.
+We also check whether we obtain a trivial solution, i.e., if any column in C is all-zero.
+We ﬁrst compare the robust Dantzig selector(λ = 2) with SSC and LASSO-SSC ( λ = 10). The
+results are shown in Figure 3. The X-axis is the number of irrelevant features and the Y-axis is the
+Relviolation deﬁned above. The ambient dimension D = 200, L = 3, d = 5, the relative sample
+density ρ = 5. The values of irrelevant features are independently sampled from a uniform distribu-
+tion in the region [−2.5, 2.5] in (a) and [−10, 10] in (b). We observe from Figure 3 that both SSC
+and Lasso SSC are very sensitive to irrelevant information. (Notice that RelViolation=0.1 is pretty
+large and can be considered as clustering failure.) Compared with that, the proposed Robust Dantzig
+Selector performs very well. Even when D1 = 20, it still detects the true subspaces perfectly. In
+the same setting, we do some further experiments, our method breaks when D1 is about 40. We
+also do further experiment for Lasso-SSC with different λ in the supplementary material to show
+Lasso-SSC is not robust to irrelevant features.
+We also examine the relation of λ to the performance of the algorithm. In Figure 4a, we test the
+subspace detection property with different λ and D1. When λ is too small, the algorithm gives a
+trivial solution (the black region in the ﬁgure). As we increase the value of λ, the corresponding
+solutions satisfy the subspace detection property (represented as the white region in the ﬁgure).
+When λ is larger than certain upper bound, RelV iolation becomes non-zero, indicating errors in
+subspace clustering. In Figure 4b, we test the subspace detection property with different λ and d.
+Notice we rescale λ with d, since by Theorem 3, λ should be proportional to d. We observe that the
+valid region of λ shrinks with increasing d which matches our theorem.
+
+6 Conclusion and future work
+
+We studied subspace clustering with irrelevant features, and proposed the “robust Dantzig selector”
+based on the idea of robust inner product, essentially a truncated version of inner product to avoid
+
+7
+
+(a)
+
+(b)
+
+Figure 3: Relviolation with different D1. Simulated with D = 200, d = 5, L = 3, ρ = 5, λ = 2,
+and D1 from 1 to 20.
+
+(a) Exact recovery with different number of
+irrelevant features. Simulated with D =
+200, d = 5, L = 3, ρ = 5 with an in-
+creasing D1 from 1 to 10. Black region:
+trivial solution. White region: Non-trivial
+solution with RelViolation=0. Gray region:
+RelViolation> 0.02.
+
+(b) Exact recovery with different subspace
+dimension d. Simulated with D = 200,
+L = 3, ρ = 5, D1 = 5 and an increas-
+ing d from 4 to 16. Black region:
+triv-
+ial solution. White region: Non-trivial so-
+lution with RelViolation=0. Gray region:
+RelViolation> 0.02.
+
+Figure 4: Subspace detection property with different λ, D1, d.
+
+any single entry having too large inﬂunce on the result. We established the sufﬁcient conditions
+for the algorithm to exactly detect the true subspace under the deterministic model and the random
+model. Simulation results demonstrate that the proposed method is robust to irrelevant information
+whereas the performance of original SSC and LASSO-SSC signiﬁcantly deteriorates.
+We now outline some directions of future research. An immediate future work is to study theoretical
+guarantees of the proposed method under the semi-random model, where each subspace is chosen
+deterministically, while samples are randomly distributed on the respective subspace. The challenge
+here is to bound the subspace incoherence, previous methods uses the rotation invariance of the data,
+which is not possible in our case as the robust inner product is invariant to rotations.
+
+Acknowledgments
+
+This work is partially supported by the Ministry of Education of Singapore AcRF Tier Two grant
+R-265-000-443-112, and A*STAR SERC PSF grant R-265-000-540-305.
+
+References
+
+[1] Pankaj K Agarwal and Nabil H Mustafa. k-means projective clustering. In Proceedings of the
+23rd ACM SIGMOD-SIGACT-SIGART symposium on Principles of database systems, pages
+
+8
+
+0510152000.20.40.60.81Number of irrelevant featuresRelViolation  Original SSCLasso SSCRobust Dantzig Selector0510152000.20.40.60.81Number of irrelevant featuresRelViolation  Original SSCLasso SSCRobust Dantzig SelectorNumber of irrelevant features D1λ1 2 3 4 5 6 7 8 9 1010.510  9.5 9   8.5 8   7.5 7   6.5 6   5.5 5   4.5 4   3.5 3   2.5 2   1.5 1   Subspace dimension dλ/d4 6 8 101214162.52.32.11.91.71.51.31.10.90.70.50.30.1155–165, 2004.
+
+[2] Keith Ball. An elementary introduction to modern convex geometry. Flavors of geometry,
+
+31:1–58, 1997.
+
+[3] Emmanuel J Cand`es, Xiaodong Li, Yi Ma, and John Wright. Robust principal component
+
+analysis? Journal of the ACM, 58(3):11, 2011.
+
+[4] Yudong Chen, Constantine Caramanis, and Shie Mannor. Robust sparse regression under ad-
+versarial corruption. In Proceedings of the 30th International Conference on Machine Learn-
+ing, pages 774–782, 2013.
+
+[5] Yudong Chen, Ali Jalali, Sujay Sanghavi, and Huan Xu. Clustering partially observed graphs
+via convex optimization. The Journal of Machine Learning Research, 15(1):2213–2238, 2014.
+[6] Ehsan Elhamifar and Ren´e Vidal. Sparse subspace clustering. In CVPR 2009, pages 2790–
+
+2797.
+
+[7] Guangcan Liu, Zhouchen Lin, and Yong Yu. Robust subspace segmentation by low-rank rep-
+resentation. In Proceedings of the 27th International Conference on Machine Learning, pages
+663–670, 2010.
+
+[8] Po-Ling Loh and Martin J Wainwright. High-dimensional regression with noisy and missing
+data: Provable guarantees with non-convexity. In Advances in Neural Information Processing
+Systems, pages 2726–2734, 2011.
+
+[9] Le Lu and Ren´e Vidal. Combined central and subspace clustering for computer vision ap-
+plications. In Proceedings of the 23rd international conference on Machine learning, pages
+593–600, 2006.
+
+[10] Yi Ma, Harm Derksen, Wei Hong, and John Wright. Segmentation of multivariate mixed data
+via lossy data coding and compression. IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 29(9):1546–1562, 2007.
+
+[11] Shankar R Rao, Roberto Tron, Ren´e Vidal, and Yi Ma. Motion segmentation via robust sub-
+space separation in the presence of outlying, incomplete, or corrupted trajectories. In CVPR
+2008.
+
+[12] Mahdi Soltanolkotabi, Emmanuel J Candes, et al. A geometric analysis of subspace clustering
+
+with outliers. The Annals of Statistics, 40(4):2195–2238, 2012.
+
+[13] Mahdi Soltanolkotabi, Ehsan Elhamifar, Emmanuel J Candes, et al. Robust subspace cluster-
+
+ing. The Annals of Statistics, 42(2):669–699, 2014.
+
+[14] R. Tibshirani. Regression shrinkage and selection via the Lasso. Journal of the Royal Statistical
+
+Society. Series B, pages 267–288, 1996.
+
+[15] Ren´e Vidal. A tutorial on subspace clustering. IEEE Signal Processing Magazine, 28(2):52–
+
+68, 2010.
+
+[16] Rene Vidal, Yi Ma, and Shankar Sastry. Generalized principal component analysis (gpca).
+
+IEEE Transactions on Pattern Analysis and Machine Intelligence, 27(12):1945–1959, 2005.
+
+[17] Ren´e Vidal, Roberto Tron, and Richard Hartley. Multiframe motion segmentation with missing
+data using powerfactorization and gpca. International Journal of Computer Vision, 79(1):85–
+105, 2008.
+
+[18] Yu-Xiang Wang and Huan Xu. Noisy sparse subspace clustering. In Proceedings of The 30th
+
+International Conference on Machine Learning, pages 89–97, 2013.
+
+[19] H. Xu, C. Caramanis, and S. Sanghavi. Robust PCA via outlier pursuit. IEEE Transactions on
+
+Information Theory, 58(5):3047–3064, 2012.
+
+[20] Jingyu Yan and Marc Pollefeys. A general framework for motion segmentation: Independent,
+articulated, rigid, non-rigid, degenerate and non-degenerate. In ECCV 2006, pages 94–106.
+2006.
+
+[21] Hao Zhu, Geert Leus, and Georgios B Giannakis. Sparsity-cognizant total least-squares for
+perturbed compressive sampling. IEEE Transactions on Signal Processing, 59(5):2002–2016,
+2011.
+
+9
+
+
