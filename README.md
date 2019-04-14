@@ -20,4 +20,4 @@ This step is straightforward
 ### Step - 4 : Training
 Run the file LSTM.py
 ### Step - 5 : Create the GUI
-The GUI is made using tkinter. The link to the video on how to use the GUI is shown [here](https://youtu.be/jgrfciDYHd4). Detailed description of this project is compiled in the Article Search Tool pdf file.
+The GUI is made using tkinter. The link to the video on how to use the GUI is shown [here](https://youtu.be/jgrfciDYHd4). Detailed description of this project is compiled in the [Article Search Tool](https://github.com/sanjeev21095/Article-Search-Tool/blob/master/Article%20Search%20Tool.pdf) pdf file.
