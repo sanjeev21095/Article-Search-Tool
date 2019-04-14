@@ -18,6 +18,6 @@ This step is straightforward
 2. Strip the document of links, citations, stop words and other special characters
 3. Tokenize the words in the document
 ### Step - 4 : Training
-Run the file LSTM.py
+Run the file [LSTM](https://github.com/sanjeev21095/Article-Search-Tool/blob/master/LSTM.py).py
 ### Step - 5 : Create the GUI
 The GUI is made using tkinter. The link to the video on how to use the GUI is shown [here](https://youtu.be/jgrfciDYHd4). Detailed description of this project is compiled in the [Article Search Tool](https://github.com/sanjeev21095/Article-Search-Tool/blob/master/Article%20Search%20Tool.pdf) pdf file.
