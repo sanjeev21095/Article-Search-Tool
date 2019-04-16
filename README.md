@@ -20,4 +20,4 @@ This step is straightforward
 ### Step - 4 : Training
 Run the file [LSTM](https://github.com/sanjeev21095/Article-Search-Tool/blob/master/LSTM.py).py
 ### Step - 5 : Create the GUI
-The GUI is made using tkinter. The link to the video on how to use the GUI is shown [here](https://youtu.be/jgrfciDYHd4). Detailed description of this project is compiled in the [Article Search Tool](https://github.com/sanjeev21095/Article-Search-Tool/blob/master/Article%20Search%20Tool.pdf) pdf file.
+The GUI is made using tkinter. The link to the video on how to use the GUI is shown [here](https://youtu.be/jgrfciDYHd4). Detailed description of this project is compiled in the [Article Search Tool](https://github.com/sanjeev21095/Article-Search-Tool/blob/master/Article%20Search%20Tool.pdf) pdf file. Verify the model by making a [paragraph vector model](https://github.com/sanjeev21095/Article-Search-Tool/blob/master/verify_with_d2v.py) and checking if the input query are actua;y present in the article. 
