@@ -6,7 +6,7 @@ documents makes it difficult to get to the right document. In order to go beyond
 keywords, it's important to build more meaningful keyword lists or databases that are rich
 in context and take the searchers intent into account. This project aims to build such a
 tool that will point to a right set of documents for the user on an offline interface.
-### Step - 1 : Downlaod the dataset
+### Step - 1 : Download the dataset
 The dataset is a set of accepted papers from the Neural Information Processing System
 Conference, 2015 (NIPS 2015) Download from [here](https://www.kaggle.com/benhamner/nips-2015-papers/version/2/home) and also the code to get the papers are shown [here](https://github.com/benhamner/nips-2015-papers). Parallely, download the pre-trained [GloVe Vectors](https://nlp.stanford.edu/projects/glove/). The first 100 files have been uploaded.
 ### Step - 2 : Dataset Cleaning
